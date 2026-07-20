@@ -1,0 +1,14 @@
+{
+  "name": "guided-turns",
+  "display_name": "Guided Turns",
+  "description": "Guided impersonation, streamed swipes, and targeted response revision with independent Connection Manager profiles.",
+  "loading_order": 100,
+  "js": "index.js",
+  "css": "style.css",
+  "author": "JJack921",
+  "version": "0.5.2",
+  "minimum_client_version": "1.18.0",
+  "manifest_version": 3,
+  "homePage": "https://github.com/JJack921/GuidedTurns",
+  "auto_update": true
+}

@@ -1,0 +1,120 @@
+<div id="gt-settings" class="extension_container">
+  <div class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+      <b>Guided Turns</b>
+      <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down" aria-hidden="true"></div>
+    </div>
+    <div class="inline-drawer-content">
+      <p class="gt-intro">
+        Shape either side of a role-play exchange with guided impersonation, streamed swipes, and focused revisions.
+      </p>
+
+      <section class="gt-settings-section" aria-labelledby="gt-profiles-heading">
+        <h4 id="gt-profiles-heading"><i class="fa-solid fa-plug" aria-hidden="true"></i> Connection profiles</h4>
+        <p class="gt-help">Each action can use its own profile. “Use current” resolves the profile selected in Connection Manager when the action starts.</p>
+
+        <div class="gt-profile-grid">
+          <div class="gt-field">
+            <label for="gt-profile-impersonate">Guided Impersonation profile</label>
+            <select id="gt-profile-impersonate" class="text_pole wide100p" data-profile-kind="impersonate" aria-describedby="gt-profile-impersonate-summary"></select>
+            <div id="gt-profile-impersonate-summary" class="gt-profile-summary" role="status" aria-live="polite"></div>
+          </div>
+
+          <div class="gt-field">
+            <label for="gt-profile-swipe">Guided Swipe profile</label>
+            <select id="gt-profile-swipe" class="text_pole wide100p" data-profile-kind="swipe" aria-describedby="gt-profile-swipe-summary"></select>
+            <div id="gt-profile-swipe-summary" class="gt-profile-summary" role="status" aria-live="polite"></div>
+          </div>
+
+          <div class="gt-field">
+            <label for="gt-profile-revision">Guided Revision profile</label>
+            <select id="gt-profile-revision" class="text_pole wide100p" data-profile-kind="revision" aria-describedby="gt-profile-revision-summary"></select>
+            <div id="gt-profile-revision-summary" class="gt-profile-summary" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="gt-settings-section" aria-labelledby="gt-impersonation-heading">
+        <h4 id="gt-impersonation-heading"><i class="fa-solid fa-user-pen" aria-hidden="true"></i> Guided Impersonation</h4>
+        <p class="gt-help">Choose how the generated user turn should refer to your persona.</p>
+        <label for="gt-perspective">Narrative perspective</label>
+        <select id="gt-perspective" class="text_pole wide100p">
+          <option value="first">First person</option>
+          <option value="second">Second person</option>
+          <option value="third">Third person</option>
+        </select>
+      </section>
+
+      <section class="gt-settings-section" aria-labelledby="gt-debug-heading">
+        <h4 id="gt-debug-heading"><i class="fa-solid fa-bug" aria-hidden="true"></i> Debugging</h4>
+        <label for="gt-debug-mode">
+          <input id="gt-debug-mode" type="checkbox">
+          Log request profiles and prompts to the browser console
+        </label>
+        <p class="gt-help">Prompts can contain private character, persona, lorebook, and chat content. Leave this disabled unless you are actively debugging.</p>
+      </section>
+
+      <div class="inline-drawer gt-prompts-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+          <b><i class="fa-solid fa-sliders" aria-hidden="true"></i> Advanced prompts</b>
+          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down" aria-hidden="true"></div>
+        </div>
+        <div class="inline-drawer-content">
+          <div class="gt-prompts-heading">
+            <p class="gt-help">Use <code>{{input}}</code> for composer text. Guided Revision also supports <code>{{message}}</code>. Standard SillyTavern macros such as <code>{{user}}</code> and <code>{{char}}</code> are supported.</p>
+            <button id="gt-reset-all-prompts" type="button" class="menu_button" title="Restore every advanced prompt to its default">Reset All</button>
+          </div>
+
+          <div class="gt-prompt-field">
+            <div class="gt-prompt-label-row">
+              <label for="gt-prompt-impersonateFirst">First-person impersonation</label>
+              <button type="button" class="menu_button gt-reset-prompt" data-prompt-key="impersonateFirst">Reset</button>
+            </div>
+            <textarea id="gt-prompt-impersonateFirst" class="text_pole wide100p" rows="6" data-prompt-key="impersonateFirst"></textarea>
+          </div>
+
+          <div class="gt-prompt-field">
+            <div class="gt-prompt-label-row">
+              <label for="gt-prompt-impersonateSecond">Second-person impersonation</label>
+              <button type="button" class="menu_button gt-reset-prompt" data-prompt-key="impersonateSecond">Reset</button>
+            </div>
+            <textarea id="gt-prompt-impersonateSecond" class="text_pole wide100p" rows="6" data-prompt-key="impersonateSecond"></textarea>
+          </div>
+
+          <div class="gt-prompt-field">
+            <div class="gt-prompt-label-row">
+              <label for="gt-prompt-impersonateThird">Third-person impersonation</label>
+              <button type="button" class="menu_button gt-reset-prompt" data-prompt-key="impersonateThird">Reset</button>
+            </div>
+            <textarea id="gt-prompt-impersonateThird" class="text_pole wide100p" rows="6" data-prompt-key="impersonateThird"></textarea>
+          </div>
+
+          <div class="gt-prompt-field">
+            <div class="gt-prompt-label-row">
+              <label for="gt-prompt-impersonateEmpty">Empty impersonation fallback</label>
+              <button type="button" class="menu_button gt-reset-prompt" data-prompt-key="impersonateEmpty">Reset</button>
+            </div>
+            <textarea id="gt-prompt-impersonateEmpty" class="text_pole wide100p" rows="4" data-prompt-key="impersonateEmpty"></textarea>
+            <p class="gt-help">Used as <code>{{input}}</code> when the composer has no outline.</p>
+          </div>
+
+          <div class="gt-prompt-field">
+            <div class="gt-prompt-label-row">
+              <label for="gt-prompt-guidedSwipe">Guided Swipe</label>
+              <button type="button" class="menu_button gt-reset-prompt" data-prompt-key="guidedSwipe">Reset</button>
+            </div>
+            <textarea id="gt-prompt-guidedSwipe" class="text_pole wide100p" rows="5" data-prompt-key="guidedSwipe"></textarea>
+          </div>
+
+          <div class="gt-prompt-field">
+            <div class="gt-prompt-label-row">
+              <label for="gt-prompt-guidedRevision">Guided Revision</label>
+              <button type="button" class="menu_button gt-reset-prompt" data-prompt-key="guidedRevision">Reset</button>
+            </div>
+            <textarea id="gt-prompt-guidedRevision" class="text_pole wide100p" rows="9" data-prompt-key="guidedRevision"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
