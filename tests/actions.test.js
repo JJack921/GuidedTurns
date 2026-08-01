@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuidedActions } from '../src/actions.js';
+import { CURRENT_PROFILE } from '../src/constants.js';
 import { createAbortError, GuidedError } from '../src/errors.js';
 
 beforeEach(() => {
@@ -31,12 +32,25 @@ function createHarness({
             connectionManager: { selectedProfile: 'guided' },
         },
         CONNECT_API_MAP: { openrouter: { selected: 'openai', source: 'openrouter' } },
+        chatCompletionSettings: {
+            preset_settings_openai: 'Current Preset',
+            temp_openai: 1,
+            prompts: [{ identifier: 'current', content: 'Current preset prompt' }],
+            prompt_order: [{ character_id: 100001, order: [{ identifier: 'current', enabled: true }] }],
+        },
         ConnectionManagerRequestService: {
             getProfile: vi.fn(() => profile),
             isProfileSupported: vi.fn(() => true),
             sendRequest: vi.fn(),
         },
-        getPresetManager: vi.fn(() => ({ getCompletionPresetByName: vi.fn(() => ({ temperature: 0.8 })) })),
+        getPresetManager: vi.fn(() => ({
+            getCompletionPresetByName: vi.fn(() => ({
+                preset_settings_openai: 'Preset B',
+                temperature: 0.8,
+                prompts: [{ identifier: 'guided', content: 'Guided preset prompt' }],
+                prompt_order: [{ character_id: 100001, order: [{ identifier: 'guided', enabled: true }] }],
+            })),
+        })),
         deactivateSendButtons: vi.fn(),
         activateSendButtons: vi.fn(),
         swipe: { isAllowed: vi.fn(() => true) },
@@ -104,6 +118,73 @@ function createHarness({
 }
 
 describe('GuidedActions impersonation', () => {
+    it('assembles the prompt with the profile preset and restores live settings afterward', async () => {
+        const harness = createHarness();
+        const originalPrompts = harness.context.chatCompletionSettings.prompts;
+        const originalPromptOrder = harness.context.chatCompletionSettings.prompt_order;
+        harness.capturePrompt.mockImplementation(async ({ context }) => {
+            expect(context.chatCompletionSettings).toMatchObject({
+                preset_settings_openai: 'Current Preset',
+                temp_openai: 0.8,
+                prompts: [{ identifier: 'guided', content: 'Guided preset prompt' }],
+                prompt_order: [{ character_id: 100001, order: [{ identifier: 'guided', enabled: true }] }],
+            });
+            return ['captured prompt'];
+        });
+
+        await harness.actions.impersonate();
+
+        expect(harness.context.chatCompletionSettings).toMatchObject({ temp_openai: 1 });
+        expect(harness.context.chatCompletionSettings.prompts).toBe(originalPrompts);
+        expect(harness.context.chatCompletionSettings.prompt_order).toBe(originalPromptOrder);
+    });
+
+    it('restores live settings when profile-based prompt capture fails', async () => {
+        const harness = createHarness();
+        const originalSettings = { ...harness.context.chatCompletionSettings };
+        harness.capturePrompt.mockImplementation(async ({ context }) => {
+            expect(context.chatCompletionSettings.prompts[0].identifier).toBe('guided');
+            throw new Error('dry run failed');
+        });
+
+        await harness.actions.impersonate();
+
+        expect(harness.context.chatCompletionSettings).toEqual(originalSettings);
+        expect(harness.notify.error).toHaveBeenCalledWith('Guided generation failed unexpectedly.');
+    });
+
+    it('restores live settings when profile-based prompt capture is aborted', async () => {
+        const harness = createHarness();
+        const originalSettings = { ...harness.context.chatCompletionSettings };
+        harness.capturePrompt.mockImplementation(({ context, signal }) => new Promise((_, reject) => {
+            expect(context.chatCompletionSettings.prompts[0].identifier).toBe('guided');
+            signal.addEventListener('abort', () => reject(createAbortError()), { once: true });
+        }));
+
+        const running = harness.actions.impersonate();
+        await vi.waitFor(() => expect(harness.actions.getState().activeKind).toBe('impersonate'));
+        harness.actions.cancelActive('impersonate');
+        await running;
+
+        expect(harness.context.chatCompletionSettings).toEqual(originalSettings);
+        expect(harness.notify.info).toHaveBeenCalledWith('Guided request cancelled.');
+    });
+
+    it('keeps current-profile mode while applying its resolved bound preset', async () => {
+        const harness = createHarness();
+        harness.settings.profileIds.impersonate = CURRENT_PROFILE;
+        harness.capturePrompt.mockImplementation(async ({ context }) => {
+            expect(context.chatCompletionSettings.prompts[0].identifier).toBe('guided');
+            return ['captured prompt'];
+        });
+
+        await harness.actions.impersonate();
+
+        expect(harness.context.ConnectionManagerRequestService.getProfile).toHaveBeenCalledWith('guided');
+        expect(harness.requestCompletion).toHaveBeenCalledWith(expect.objectContaining({ profile: harness.profile }));
+        expect(harness.context.chatCompletionSettings.prompts[0].identifier).toBe('current');
+    });
+
     it('logs the resolved profile and exact captured prompt only in debug mode', async () => {
         const harness = createHarness();
         harness.settings.debugMode = true;
@@ -251,6 +332,21 @@ describe('GuidedActions impersonation', () => {
 });
 
 describe('GuidedActions swipe and coordination', () => {
+    it.each([
+        ['Guided Swipe', actions => actions.guidedSwipe()],
+        ['Guided Revision', actions => actions.guidedRevision()],
+    ])('assembles %s with the profile preset prompt templates', async (_label, invoke) => {
+        const harness = createHarness({ composerText: 'change it' });
+        harness.capturePrompt.mockImplementation(async ({ context }) => {
+            expect(context.chatCompletionSettings.prompts[0].identifier).toBe('guided');
+            return ['captured prompt'];
+        });
+
+        await invoke(harness.actions);
+
+        expect(harness.context.chatCompletionSettings.prompts[0].identifier).toBe('current');
+    });
+
     it('logs the swipe profile and captured prompt in debug mode', async () => {
         const harness = createHarness();
         harness.settings.debugMode = true;

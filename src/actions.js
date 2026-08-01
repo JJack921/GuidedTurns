@@ -2,7 +2,7 @@
 
 import { EXTENSION_LOG_PREFIX, PERSPECTIVE_PROMPT_KEYS } from './constants.js';
 import { GuidedError, isAbortError } from './errors.js';
-import { captureDryRunPrompt } from './prompt-capture.js';
+import { captureDryRunPrompt, capturePromptWithPreset } from './prompt-capture.js';
 import { expandPrompt, expandPromptTemplate } from './prompts.js';
 import { validateGuidedProfile } from './profiles.js';
 import { sendGuidedCompletion, streamGuidedCompletion } from './request.js';
@@ -142,7 +142,7 @@ export class GuidedActions {
             const chatId = await getChatIdentity(context);
             const source = composer.value;
             const settings = this.getSettings();
-            const { profile } = validateGuidedProfile(context, settings.profileIds.impersonate);
+            const { profile, mode, preset } = validateGuidedProfile(context, settings.profileIds.impersonate);
             const promptKey = PERSPECTIVE_PROMPT_KEYS[settings.perspective];
             const substituteParams = context.substituteParams || (value => value);
             const effectiveInput = source.trim()
@@ -151,7 +151,15 @@ export class GuidedActions {
             const quietPrompt = expandPrompt(settings.prompts[promptKey], effectiveInput, substituteParams);
 
             await this.#run('impersonate', context, async signal => {
-                const prompt = await this.capturePrompt({ context, type: 'impersonate', quietPrompt, signal });
+                const prompt = await capturePromptWithPreset({
+                    context,
+                    mode,
+                    preset,
+                    capturePrompt: this.capturePrompt,
+                    type: 'impersonate',
+                    quietPrompt,
+                    signal,
+                });
                 logDebugRequest(settings, 'impersonate', profile, prompt);
                 const result = await this.requestCompletion({ context, profile, prompt, signal });
                 const currentContext = this.getContext();
@@ -223,7 +231,7 @@ export class GuidedActions {
                     code: 'revision_guidance_required',
                 });
             }
-            const { profile } = validateGuidedProfile(context, settings.profileIds[profileKey]);
+            const { profile, mode, preset } = validateGuidedProfile(context, settings.profileIds[profileKey]);
             const messageIndex = context.chat.length - 1;
             const targetMessage = context.chat[messageIndex];
             if (!isSwipeableAssistantMessage(targetMessage)) {
@@ -252,7 +260,15 @@ export class GuidedActions {
                 (targetMessage.swipe_id ?? null) === sourceSwipeId;
 
             await this.#run(kind, context, async signal => {
-                const prompt = await this.capturePrompt({ context, type: 'swipe', quietPrompt, signal });
+                const prompt = await capturePromptWithPreset({
+                    context,
+                    mode,
+                    preset,
+                    capturePrompt: this.capturePrompt,
+                    type: 'swipe',
+                    quietPrompt,
+                    signal,
+                });
                 if (!await isSourceCurrent()) {
                     throw new GuidedError(`The source response changed while ${actionLabel} was running, so the result was not added.`, {
                         code: 'swipe_target_changed',

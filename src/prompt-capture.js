@@ -3,6 +3,65 @@
 import { PROMPT_CAPTURE_TIMEOUT_MS } from './constants.js';
 import { createAbortError, GuidedError } from './errors.js';
 
+const CHAT_PRESET_KEY_ALIASES = Object.freeze({
+    temperature: 'temp_openai',
+    frequency_penalty: 'freq_pen_openai',
+    presence_penalty: 'pres_pen_openai',
+    top_p: 'top_p_openai',
+    top_k: 'top_k_openai',
+    top_a: 'top_a_openai',
+    min_p: 'min_p_openai',
+    repetition_penalty: 'repetition_penalty_openai',
+});
+
+function clonePresetValue(value) {
+    if (value === undefined || value === null || typeof value !== 'object') return value;
+    return structuredClone(value);
+}
+
+function getPresetSettings(context, mode) {
+    return mode === 'chat' ? context?.chatCompletionSettings : context?.textCompletionSettings;
+}
+
+function getPresetSettingsKey(settings, mode, presetKey) {
+    if ((mode === 'chat' && presetKey === 'preset_settings_openai') || (mode === 'text' && presetKey === 'preset')) {
+        return null;
+    }
+    const settingsKey = mode === 'chat' ? CHAT_PRESET_KEY_ALIASES[presetKey] ?? presetKey : presetKey;
+    return Object.hasOwn(settings, settingsKey) ? settingsKey : null;
+}
+
+export async function capturePromptWithPreset({
+    context,
+    mode,
+    preset,
+    capturePrompt = captureDryRunPrompt,
+    ...captureOptions
+}) {
+    const liveSettings = getPresetSettings(context, mode);
+    if (!liveSettings || typeof liveSettings !== 'object') {
+        throw new GuidedError('This SillyTavern version does not expose live completion settings for prompt capture.', {
+            code: 'preset_settings_unavailable',
+        });
+    }
+
+    const snapshot = new Map();
+    try {
+        for (const [presetKey, value] of Object.entries(preset ?? {})) {
+            const settingsKey = getPresetSettingsKey(liveSettings, mode, presetKey);
+            if (!settingsKey || snapshot.has(settingsKey)) continue;
+            snapshot.set(settingsKey, liveSettings[settingsKey]);
+            liveSettings[settingsKey] = clonePresetValue(value);
+        }
+
+        return await capturePrompt({ context, ...captureOptions });
+    } finally {
+        for (const [settingsKey, value] of snapshot) {
+            liveSettings[settingsKey] = value;
+        }
+    }
+}
+
 function addListener(eventSource, eventName, handler) {
     eventSource.on(eventName, handler);
     return () => {

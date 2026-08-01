@@ -83,7 +83,7 @@ Select **Guided Revision**. The latest assistant response is supplied to the rev
 
 ## Profiles, prompts, and perspectives
 
-The three actions have independent profile settings. A dedicated profile is useful when you want a smaller model for drafting, a more precise model for revision, or different presets for user and assistant turns. **Use current** resolves the Connection Manager selection when the action starts.
+The three actions have independent profile settings. A dedicated profile is useful when you want a smaller model for drafting, a more precise model for revision, or different presets for user and assistant turns. Guided Turns uses the resolved profile's bound preset both to assemble the prompt (including its system-prompt templates and prompt order) and to set generation parameters. It restores the active SillyTavern preset settings immediately after prompt assembly, without changing the visible preset selection. **Use current** resolves the Connection Manager selection when the action starts and uses that profile's bound preset in the same way.
 
 Guided Impersonation supports:
 
@@ -113,7 +113,7 @@ Open Connection Manager and confirm that the selected profile still exists and t
 
 **The profile has no preset**
 
-Edit the Connection Manager profile and bind a generation preset. Guided Turns includes the profile’s preset and instruct settings in each request.
+Edit the Connection Manager profile and bind a generation preset. Guided Turns uses the profile's preset prompt templates while assembling the request and includes its generation preset and instruct settings when sending it.
 
 **The completion modes do not match**
 

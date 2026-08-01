@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it, vi } from 'vitest';
-import { captureDryRunPrompt } from '../src/prompt-capture.js';
+import { captureDryRunPrompt, capturePromptWithPreset } from '../src/prompt-capture.js';
 
 class EventSource {
     listeners = new Map();
@@ -74,5 +74,34 @@ describe('dry-run prompt capture', () => {
         };
         await expect(captureDryRunPrompt({ context, type: 'swipe' })).rejects.toThrow('dry run failed');
         expect(eventSource.listeners.get('after-data')).toEqual([]);
+    });
+});
+
+describe('preset-aware prompt capture', () => {
+    it('temporarily overlays text-completion settings without changing the selected preset', async () => {
+        const liveSettings = { preset: 'Current', temp: 0.7, sampler_priority: ['temperature', 'top_p'] };
+        const context = { textCompletionSettings: liveSettings };
+        const originalPriority = liveSettings.sampler_priority;
+        const capturePrompt = vi.fn(async ({ type }) => {
+            expect(type).toBe('swipe');
+            expect(liveSettings).toEqual({
+                preset: 'Current',
+                temp: 0.2,
+                sampler_priority: ['top_p', 'temperature'],
+            });
+            return 'assembled prompt';
+        });
+
+        const prompt = await capturePromptWithPreset({
+            context,
+            mode: 'text',
+            preset: { preset: 'Dedicated', temp: 0.2, sampler_priority: ['top_p', 'temperature'] },
+            capturePrompt,
+            type: 'swipe',
+        });
+
+        expect(prompt).toBe('assembled prompt');
+        expect(liveSettings).toEqual({ preset: 'Current', temp: 0.7, sampler_priority: originalPriority });
+        expect(liveSettings.sampler_priority).toBe(originalPriority);
     });
 });
