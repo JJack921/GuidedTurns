@@ -8,7 +8,7 @@ It adds three focused actions beside the composer:
 - **Guided Swipe** streams a new Swipe for the latest assistant response, optionally following guidance from the composer.
 - **Guided Revision** rewrites the latest assistant response according to a specific correction while preserving everything else.
 
-Each action can use the active Connection Manager profile or its own dedicated profile and preset.
+Each action can use the active Connection Manager profile or its own dedicated profile and preset. Guided Impersonation, Guided Swipe, and Guided Revision work in both single-character and group chats.
 
 ![Guided Turns action bar with Guided Impersonation, Guided Swipe, and Guided Revision](docs/screenshots/guided-turns-action-bar.jpg)
 
@@ -17,7 +17,7 @@ Each action can use the active Connection Manager profile or its own dedicated p
 - SillyTavern **1.18.0 or newer**.
 - The built-in **Connection Manager** extension enabled.
 - A Connection Manager profile with a bound generation preset.
-- A **single-character chat**. Group chats are not supported yet.
+- A single-character or group chat with at least one valid group member.
 
 The selected guided profile must use the same completion mode as the current chat: Chat Completion profiles for Chat Completion chats, and Text Completion profiles for Text Completion chats.
 
@@ -61,6 +61,8 @@ Select **Guided Impersonation**. The generated user turn replaces the outline in
 
 You may also leave the composer empty. In that case, Guided Turns asks the model for one natural next user turn based on the current scene and persona. Use **Restore Outline** to recover the previous composer text after a successful impersonation. The restore option is cleared when you send a message or switch chats.
 
+In a group chat, Guided Impersonation still generates the user persona. Guided Turns uses the most recent valid assistant speaker only as internal prompt context; if none is available, it falls back to the first enabled valid member and then the first valid member.
+
 ### Guided Swipe
 
 Put optional direction in the composer:
@@ -80,6 +82,8 @@ keep the dialogue, but change the narration to past tense
 ```
 
 Select **Guided Revision**. The latest assistant response is supplied to the revision prompt and the replacement streams into a new Swipe. The composer instruction is required and is not cleared.
+
+In a group chat, Guided Swipe and Guided Revision use the latest response's recorded speaker avatar. Legacy messages without that metadata are accepted only when their speaker name uniquely identifies a current group member.
 
 ## Profiles, prompts, and perspectives
 
@@ -123,9 +127,9 @@ Choose a Chat Completion profile for an OpenAI-compatible chat, or a Text Comple
 
 The latest message must be a swipeable assistant response, and native Swipe controls must currently be available.
 
-**A group chat is rejected**
+**A group response cannot be targeted**
 
-Group support is under investigation. Native group generation depends on active-speaker and prompt-routing behavior that independent guided profiles do not currently reproduce safely.
+Guided Swipe and Guided Revision require the latest message to be a swipeable assistant response with a valid, unambiguous group speaker. Restore the speaker's character to the group, or use a message with a unique legacy speaker name.
 
 ## Development
 
