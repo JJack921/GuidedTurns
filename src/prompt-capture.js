@@ -2,6 +2,7 @@
 
 import { PROMPT_CAPTURE_TIMEOUT_MS } from './constants.js';
 import { createAbortError, GuidedError } from './errors.js';
+import { prepareGroupPromptContext } from './group-context.js';
 
 const CHAT_PRESET_KEY_ALIASES = Object.freeze({
     temperature: 'temp_openai',
@@ -79,6 +80,8 @@ export async function captureDryRunPrompt({
     quietPrompt = '',
     signal,
     timeoutMs = PROMPT_CAPTURE_TIMEOUT_MS,
+    groupTarget = null,
+    ensureGroupTarget = () => {},
 }) {
     if (!context?.generate || !context?.eventSource || !context?.eventTypes?.GENERATE_AFTER_DATA) {
         throw new GuidedError('This SillyTavern version does not expose the dry-run prompt API.', { code: 'dry_run_unavailable' });
@@ -89,6 +92,27 @@ export async function captureDryRunPrompt({
     let timer = null;
     let abortHandler = null;
     const eventName = context.eventTypes.GENERATE_AFTER_DATA;
+    const groupPromptContext = prepareGroupPromptContext({ context, target: groupTarget });
+    const restoreGroupArrays = groupPromptContext.restore;
+    const removeCombinationListeners = [];
+    const ensureAtPromptCombination = () => ensureGroupTarget();
+    const restoreAtPromptCombination = () => {
+        ensureGroupTarget();
+        restoreGroupArrays();
+    };
+    const beforeCombinationEventName = context.eventTypes.GENERATE_BEFORE_COMBINE_PROMPTS;
+    if (groupTarget && beforeCombinationEventName) {
+        removeCombinationListeners.push(addListener(context.eventSource, beforeCombinationEventName, ensureAtPromptCombination));
+    }
+    const combinationEventNames = [context.eventTypes.GENERATE_AFTER_COMBINE_PROMPTS].filter(Boolean);
+    for (const combinationEventName of combinationEventNames) {
+        removeCombinationListeners.push(addListener(context.eventSource, combinationEventName, restoreAtPromptCombination));
+    }
+    if (!combinationEventNames.includes(eventName)) {
+        removeCombinationListeners.push(addListener(context.eventSource, eventName, (_data, dryRun) => {
+            if (dryRun === true) restoreAtPromptCombination();
+        }));
+    }
     const removeListener = addListener(context.eventSource, eventName, (data, dryRun) => {
         if (dryRun === true && data && Object.hasOwn(data, 'prompt')) {
             capturedData = data;
@@ -105,11 +129,14 @@ export async function captureDryRunPrompt({
         })), timeoutMs);
     });
 
-    const generationPromise = Promise.resolve().then(() => context.generate(type, {
+    const generationOptions = {
         quiet_prompt: quietPrompt,
         quietToLoud: true,
         signal,
-    }, true));
+    };
+    if (groupTarget && Number.isInteger(groupTarget.id)) generationOptions.force_chid = groupTarget.id;
+
+    const generationPromise = Promise.resolve().then(() => context.generate(type, generationOptions, true));
     generationPromise.catch(() => {});
 
     try {
@@ -122,6 +149,8 @@ export async function captureDryRunPrompt({
         return capturedData.prompt;
     } finally {
         removeListener();
+        for (const removeCombinationListener of removeCombinationListeners) removeCombinationListener();
+        restoreGroupArrays();
         clearTimeout(timer);
         signal?.removeEventListener('abort', abortHandler);
     }

@@ -7,16 +7,20 @@ import { expandPrompt, expandPromptTemplate } from './prompts.js';
 import { validateGuidedProfile } from './profiles.js';
 import { sendGuidedCompletion, streamGuidedCompletion } from './request.js';
 import { createGuidedSwipeSession, isSwipeableAssistantMessage } from './swipes.js';
+import {
+    createGroupActionScope,
+    groupIdentity,
+    isGroupChat,
+    resolveGroupPromptTarget,
+    resolveGroupSpeaker,
+    sameGroupIdentity,
+} from './group-context.js';
 
 async function getChatIdentity(context) {
     if (typeof context?.getCurrentChatId === 'function') {
         return await context.getCurrentChatId();
     }
     return context?.chatId ?? null;
-}
-
-function isGroupChat(context) {
-    return context?.groupId !== null && context?.groupId !== undefined && context?.groupId !== '';
 }
 
 function setComposerValue(composer, value) {
@@ -113,8 +117,11 @@ export class GuidedActions {
             const composer = this.getComposer();
             if (!composer) throw new GuidedError('The SillyTavern composer could not be found.', { code: 'composer_missing' });
 
-            const chatId = await getChatIdentity(this.getContext());
-            if (this.restoreState !== restoreState || chatId !== restoreState.chatId) {
+            const context = this.getContext();
+            const chatId = await getChatIdentity(context);
+            if (this.restoreState !== restoreState ||
+                !sameGroupIdentity(groupIdentity(context), restoreState.groupId) ||
+                !sameGroupIdentity(chatId, restoreState.chatId)) {
                 this.#clearRestoreState();
                 return;
             }
@@ -140,6 +147,8 @@ export class GuidedActions {
             if (!composer) throw new GuidedError('The SillyTavern composer could not be found.', { code: 'composer_missing' });
 
             const chatId = await getChatIdentity(context);
+            const groupTarget = resolveGroupPromptTarget(context, { kind: 'impersonate' });
+            const groupId = groupIdentity(context);
             const source = composer.value;
             const settings = this.getSettings();
             const { profile, mode, preset } = validateGuidedProfile(context, settings.profileIds.impersonate);
@@ -150,7 +159,22 @@ export class GuidedActions {
                 : String(substituteParams(settings.prompts.impersonateEmpty) ?? settings.prompts.impersonateEmpty);
             const quietPrompt = expandPrompt(settings.prompts[promptKey], effectiveInput, substituteParams);
 
-            await this.#run('impersonate', context, async signal => {
+            const isTargetCurrent = async () => {
+                const currentContext = this.getContext();
+                const currentChatId = await getChatIdentity(currentContext);
+                if (!sameGroupIdentity(groupIdentity(currentContext), groupId) || !sameGroupIdentity(currentChatId, chatId)) return false;
+                if (!groupTarget?.sourceMessage) return true;
+
+                const currentSourceMessage = currentContext.chat?.[groupTarget.sourceMessageIndex];
+                if (currentSourceMessage !== groupTarget.sourceMessage) return false;
+                try {
+                    return resolveGroupSpeaker(currentContext, currentSourceMessage).avatar === groupTarget.avatar;
+                } catch {
+                    return false;
+                }
+            };
+
+            await this.#run('impersonate', context, async (signal, groupScope) => {
                 const prompt = await capturePromptWithPreset({
                     context,
                     mode,
@@ -159,23 +183,24 @@ export class GuidedActions {
                     type: 'impersonate',
                     quietPrompt,
                     signal,
+                    groupTarget,
+                    ensureGroupTarget: () => groupScope?.ensureTarget(),
                 });
+                groupScope?.ensureTarget();
                 logDebugRequest(settings, 'impersonate', profile, prompt);
                 const result = await this.requestCompletion({ context, profile, prompt, signal });
-                const currentContext = this.getContext();
                 const currentComposer = this.getComposer();
-                const currentChatId = await getChatIdentity(currentContext);
 
-                if (currentChatId !== chatId || currentComposer !== composer || composer.value !== source) {
+                if (!await isTargetCurrent() || currentComposer !== composer || composer.value !== source) {
                     throw new GuidedError('The chat or composer changed while the impersonation was running, so the result was not applied.', {
                         code: 'impersonation_target_changed',
                     });
                 }
 
                 setComposerValue(composer, result);
-                this.restoreState = { chatId, source };
+                this.restoreState = { groupId, chatId, source };
                 this.notify.success('Impersonation is ready for review.');
-            });
+            }, undefined, groupTarget);
         } catch (error) {
             this.#reportError(error);
         }
@@ -239,11 +264,14 @@ export class GuidedActions {
                     code: 'swipe_target_invalid',
                 });
             }
+            const groupTarget = resolveGroupPromptTarget(context, { kind: 'assistant', message: targetMessage });
             if (typeof context.swipe?.isAllowed === 'function' && !context.swipe.isAllowed()) {
                 throw new GuidedError('Swiping is currently disabled or unavailable.', { code: 'swipe_unavailable' });
             }
 
             const chatId = await getChatIdentity(context);
+            const groupId = groupIdentity(context);
+            const sourceSpeakerAvatar = groupTarget?.avatar ?? null;
             const sourceMessage = String(targetMessage.mes ?? '');
             const sourceSwipeId = targetMessage.swipe_id ?? null;
             const quietPrompt = createQuietPrompt({ settings, guidance, sourceMessage, context });
@@ -251,15 +279,20 @@ export class GuidedActions {
             const isTargetCurrent = async () => {
                 const currentContext = this.getContext();
                 const currentChatId = await getChatIdentity(currentContext);
-                return currentChatId === chatId &&
-                    currentContext.chat.length - 1 === messageIndex &&
-                    currentContext.chat[messageIndex] === targetMessage;
+                if (!sameGroupIdentity(groupIdentity(currentContext), groupId) || !sameGroupIdentity(currentChatId, chatId)) return false;
+                if (currentContext.chat.length - 1 !== messageIndex || currentContext.chat[messageIndex] !== targetMessage) return false;
+                if (!isGroupChat(context)) return true;
+                try {
+                    return resolveGroupSpeaker(currentContext, currentContext.chat[messageIndex]).avatar === sourceSpeakerAvatar;
+                } catch {
+                    return false;
+                }
             };
             const isSourceCurrent = async () => await isTargetCurrent() &&
                 String(targetMessage.mes ?? '') === sourceMessage &&
                 (targetMessage.swipe_id ?? null) === sourceSwipeId;
 
-            await this.#run(kind, context, async signal => {
+            await this.#run(kind, context, async (signal, groupScope) => {
                 const prompt = await capturePromptWithPreset({
                     context,
                     mode,
@@ -268,7 +301,10 @@ export class GuidedActions {
                     type: 'swipe',
                     quietPrompt,
                     signal,
+                    groupTarget,
+                    ensureGroupTarget: () => groupScope?.ensureTarget(),
                 });
+                groupScope?.ensureTarget();
                 if (!await isSourceCurrent()) {
                     throw new GuidedError(`The source response changed while ${actionLabel} was running, so the result was not added.`, {
                         code: 'swipe_target_changed',
@@ -285,6 +321,7 @@ export class GuidedActions {
                     isTargetCurrent,
                     actionLabel,
                 });
+                groupScope?.ensureTarget();
 
                 try {
                     logDebugRequest(settings, kind, profile, prompt);
@@ -321,7 +358,7 @@ export class GuidedActions {
 
                 await session.commit();
                 this.notify.success(`${actionLabel} added.`);
-            }, kind === 'revision' ? 'Guided Revision cancelled.' : undefined);
+            }, kind === 'revision' ? 'Guided Revision cancelled.' : undefined, groupTarget);
         } catch (error) {
             this.#reportError(error);
         }
@@ -332,21 +369,24 @@ export class GuidedActions {
         if (this.nativeBusy || documentGenerating) {
             throw new GuidedError('Wait for the current SillyTavern generation to finish.', { code: 'native_generation_busy' });
         }
-        const context = this.getContext();
-        if (isGroupChat(context)) {
-            throw new GuidedError('Group chats are not supported yet.', { code: 'group_chat_unsupported' });
-        }
-        return context;
+        return this.getContext();
     }
 
-    async #run(kind, context, task, abortMessage = 'Guided request cancelled.') {
+    async #run(kind, context, task, abortMessage = 'Guided request cancelled.', groupTarget = null) {
         const controller = new AbortController();
         this.active = { kind, controller };
+        let groupScope = null;
 
         try {
+            groupScope = createGroupActionScope({
+                context,
+                target: groupTarget,
+                core: this.core,
+                getContext: this.getContext,
+            });
             this.onStateChange(this.getState());
             context.deactivateSendButtons?.();
-            await task(controller.signal);
+            await task(controller.signal, groupScope);
         } catch (error) {
             if (error instanceof GuidedError && ['swipe_target_changed', 'impersonation_target_changed'].includes(error.code)) {
                 this.#reportError(error);
@@ -359,8 +399,12 @@ export class GuidedActions {
             try {
                 context.activateSendButtons?.();
             } finally {
-                this.active = null;
-                this.onStateChange(this.getState());
+                try {
+                    groupScope?.restore();
+                } finally {
+                    this.active = null;
+                    this.onStateChange(this.getState());
+                }
             }
         }
     }

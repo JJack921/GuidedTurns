@@ -120,6 +120,34 @@ describe('guided swipes', () => {
         expect(context.swipe.refresh).toHaveBeenCalledWith(true, false);
     });
 
+    it('preserves group message identity and the existing generation id in a new Swipe', async () => {
+        const { message, context, core } = fixture();
+        context.groupId = 'group-1';
+        Object.assign(message, {
+            name: 'Bob',
+            original_avatar: 'bob.png',
+            force_avatar: 'avatar-bob',
+        });
+        message.extra.gen_id = 'group-generation-7';
+
+        const session = await createGuidedSwipeSession({
+            context,
+            core,
+            messageIndex: 0,
+            profile: { id: 'guided', api: 'openrouter', model: 'm' },
+        });
+        await session.update({ text: 'replacement' });
+        await session.commit();
+
+        expect(message).toMatchObject({
+            name: 'Bob',
+            original_avatar: 'bob.png',
+            force_avatar: 'avatar-bob',
+        });
+        expect(message.extra.gen_id).toBe('group-generation-7');
+        expect(message.swipe_info[2].extra.gen_id).toBe('group-generation-7');
+    });
+
     it('marks streamed partial output as interrupted when requested', async () => {
         const { message, context, core } = fixture();
         const session = await createGuidedSwipeSession({

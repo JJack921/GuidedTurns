@@ -14,6 +14,7 @@ function createHarness({
     perspective = 'first',
     composerText = 'an outline',
     chat = [{ mes: 'assistant reply', is_user: false, is_system: false, extra: {} }],
+    core = {},
 } = {}) {
     document.body.innerHTML = '<textarea id="send_textarea"></textarea>';
     const composer = document.getElementById('send_textarea');
@@ -92,7 +93,7 @@ function createHarness({
         getContext: () => context,
         getSettings: () => settings,
         getComposer: () => composer,
-        core: {},
+        core,
         notify,
         onStateChange,
         capturePrompt,
@@ -114,7 +115,35 @@ function createHarness({
         settings,
         swipeSession,
         onStateChange,
+        core,
     };
+}
+
+function createGroupHarness({
+    actionChat = [{ mes: 'assistant reply', is_user: false, is_system: false, original_avatar: 'bob.png', name: 'Bob', extra: {} }],
+    disabledMembers = ['alice.png'],
+} = {}) {
+    const core = {
+        setCharacterId: vi.fn(),
+        setCharacterName: vi.fn(),
+    };
+    const harness = createHarness({ chat: actionChat, core });
+    const characters = [
+        { avatar: 'alice.png', name: 'Alice' },
+        { avatar: 'bob.png', name: 'Bob' },
+        { avatar: 'carol.png', name: 'Carol' },
+    ];
+    const group = {
+        id: 'group-1',
+        members: ['alice.png', 'bob.png', 'carol.png'],
+        disabled_members: [...disabledMembers],
+    };
+    harness.context.groupId = group.id;
+    harness.context.groups = [group];
+    harness.context.characters = characters;
+    harness.context.characterId = 2;
+    harness.context.name2 = 'Prior Character';
+    return { ...harness, characters, group };
 }
 
 describe('GuidedActions impersonation', () => {
@@ -435,15 +464,73 @@ describe('GuidedActions swipe and coordination', () => {
     });
 
     it.each([
-        ['Guided Impersonation', actions => actions.impersonate()],
-        ['Guided Swipe', actions => actions.guidedSwipe()],
-        ['Guided Revision', actions => actions.guidedRevision()],
-    ])('rejects %s in group chats', async (_label, invoke) => {
-        const harness = createHarness({ composerText: 'make it warmer' });
-        harness.context.groupId = 'group-1';
+        ['Guided Impersonation', actions => actions.impersonate(), 'impersonate'],
+        ['Guided Swipe', actions => actions.guidedSwipe(), 'swipe'],
+        ['Guided Revision', actions => actions.guidedRevision(), 'swipe'],
+    ])('supports %s in group chats while preserving the group arrays', async (_label, invoke, type) => {
+        const harness = createGroupHarness({
+            actionChat: [{ mes: 'assistant reply', is_user: false, is_system: false, original_avatar: 'bob.png', name: 'Bob', extra: {} }],
+        });
+        const originalMembers = [...harness.group.members];
+        const originalDisabledMembers = [...harness.group.disabled_members];
+
         await invoke(harness.actions);
-        expect(harness.notify.error).toHaveBeenCalledWith('Group chats are not supported yet.');
-        expect(harness.capturePrompt).not.toHaveBeenCalled();
+
+        expect(harness.capturePrompt).toHaveBeenCalledWith(expect.objectContaining({
+            type,
+            groupTarget: expect.objectContaining({ avatar: 'bob.png', name: 'Bob' }),
+        }));
+        expect(harness.group.members).toEqual(originalMembers);
+        expect(harness.group.disabled_members).toEqual(originalDisabledMembers);
+        expect(harness.core.setCharacterId).toHaveBeenNthCalledWith(1, 1);
+        expect(harness.core.setCharacterId).toHaveBeenLastCalledWith(2);
+        expect(harness.core.setCharacterName).toHaveBeenNthCalledWith(1, 'Bob');
+        expect(harness.core.setCharacterName).toHaveBeenLastCalledWith('Prior Character');
+    });
+
+    it('rejects a group action when the source speaker changes while it runs', async () => {
+        const harness = createGroupHarness();
+        harness.requestSwipeCompletion.mockImplementation(async () => {
+            harness.context.chat[0].original_avatar = 'carol.png';
+            throw new GuidedError('source changed', { code: 'swipe_target_changed' });
+        });
+
+        await harness.actions.guidedSwipe();
+
+        expect(harness.swipeSession.rollback).toHaveBeenCalledWith({ render: false });
+        expect(harness.notify.error).toHaveBeenCalledWith(expect.stringContaining('discarded'));
+        expect(harness.group.members).toEqual(['alice.png', 'bob.png', 'carol.png']);
+        expect(harness.group.disabled_members).toEqual(['alice.png']);
+    });
+
+    it('discards a group result when the group chat identity changes', async () => {
+        const harness = createGroupHarness();
+        harness.requestSwipeCompletion.mockImplementation(async () => {
+            harness.context.groupId = 'other-group';
+            throw new Error('request failed');
+        });
+
+        await harness.actions.guidedSwipe();
+
+        expect(harness.swipeSession.rollback).toHaveBeenCalledWith({ render: false });
+        expect(harness.notify.error).toHaveBeenCalledWith(expect.stringContaining('discarded'));
+        expect(harness.core.setCharacterId).not.toHaveBeenCalledWith(2);
+        expect(harness.core.setCharacterName).not.toHaveBeenCalledWith('Prior Character');
+    });
+
+    it('restores the prior group character state when a guided action is cancelled', async () => {
+        const harness = createGroupHarness();
+        harness.capturePrompt.mockImplementation(({ signal }) => new Promise((_, reject) => {
+            signal.addEventListener('abort', () => reject(createAbortError()), { once: true });
+        }));
+        const running = harness.actions.guidedSwipe();
+        await vi.waitFor(() => expect(harness.actions.getState().activeKind).toBe('swipe'));
+        harness.actions.cancelActive('swipe');
+        await running;
+
+        expect(harness.notify.info).toHaveBeenCalledWith('Guided request cancelled.');
+        expect(harness.core.setCharacterId).toHaveBeenLastCalledWith(2);
+        expect(harness.core.setCharacterName).toHaveBeenLastCalledWith('Prior Character');
     });
 
     it('cancels an in-flight action when its button is invoked again', async () => {

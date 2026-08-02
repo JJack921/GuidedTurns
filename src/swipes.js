@@ -2,6 +2,7 @@
 
 import { EXTENSION_LOG_PREFIX } from './constants.js';
 import { GuidedError } from './errors.js';
+import { isGroupChat } from './group-context.js';
 
 function clone(value) {
     return value === undefined ? undefined : structuredClone(value);
@@ -10,6 +11,21 @@ function clone(value) {
 function restoreMessage(message, snapshot) {
     for (const key of Object.keys(message)) delete message[key];
     Object.assign(message, clone(snapshot));
+}
+
+function snapshotMessageIdentity(message) {
+    const identity = {};
+    for (const key of ['name', 'original_avatar', 'force_avatar']) {
+        if (Object.hasOwn(message || {}, key)) identity[key] = clone(message[key]);
+    }
+    return identity;
+}
+
+function restoreMessageIdentity(message, identity) {
+    for (const key of ['name', 'original_avatar', 'force_avatar']) {
+        if (Object.hasOwn(identity, key)) message[key] = clone(identity[key]);
+        else delete message[key];
+    }
 }
 
 function targetChangedError(actionLabel) {
@@ -58,6 +74,7 @@ export class GuidedSwipeSession {
         this.isTargetCurrent = isTargetCurrent;
         this.actionLabel = actionLabel;
         this.snapshot = clone(this.message);
+        this.messageIdentity = snapshotMessageIdentity(this.message);
         this.newSwipeId = -1;
         this.rawText = '';
         this.reasoning = '';
@@ -81,11 +98,15 @@ export class GuidedSwipeSession {
             this.core.syncMesToSwipe(this.messageIndex);
 
             const currentInfo = this.message.swipe_info?.[this.message.swipe_id ?? 0];
+            const isGroupMessage = isGroupChat(this.context);
+            const existingGenId = isGroupMessage && Object.hasOwn(this.message.extra || {}, 'gen_id')
+                ? this.message.extra.gen_id
+                : isGroupMessage ? currentInfo?.extra?.gen_id : undefined;
             const extra = {
                 ...(currentInfo?.extra && Object.hasOwn(currentInfo.extra, 'bias') ? { bias: currentInfo.extra.bias } : {}),
                 api: this.profile.api,
                 model: this.profile.model || '',
-                gen_id: Date.now(),
+                gen_id: existingGenId ?? Date.now(),
                 guided_generation: true,
                 guided_profile_id: this.profile.id,
                 reasoning: '',
@@ -107,6 +128,7 @@ export class GuidedSwipeSession {
             this.message.gen_finished = null;
             this.message.extra = clone(extra);
             delete this.message.title;
+            restoreMessageIdentity(this.message, this.messageIdentity);
 
             this.#renderFull();
             this.context.swipe?.hide?.({ hideCounters: true });

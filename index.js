@@ -7,6 +7,8 @@ import {
     ensureSwipes,
     getStoppingStrings,
     saveSettingsDebounced,
+    setCharacterId,
+    setCharacterName,
     syncMesToSwipe,
 } from '../../../../script.js';
 import { ReasoningHandler } from '../../../reasoning.js';
@@ -24,6 +26,8 @@ async function init() {
                 ensureSwipes,
                 getStoppingStrings,
                 ReasoningHandler,
+                setCharacterId,
+                setCharacterName,
                 syncMesToSwipe,
             },
         });
