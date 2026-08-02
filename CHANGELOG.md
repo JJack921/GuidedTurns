@@ -2,12 +2,11 @@
 
 All notable changes to Guided Turns are documented here.
 
-## [0.5.3] - 2026-08-01
+## [0.6.1] - 2026-08-02
 
 ### Fixed
 
-- Assemble Guided Impersonation, Guided Swipe, and Guided Revision prompts with the resolved Connection Manager profile's bound preset, instead of combining that profile's generation parameters with the currently selected SillyTavern preset's system prompts.
-- Restore live Chat Completion or Text Completion settings after prompt capture succeeds, fails, or is cancelled, without changing the visible preset selection.
+- Display the mobile action bar as a compact, single-row set of icon-only buttons while preserving accessible action labels.
 
 ## [0.6.0] - 2026-08-02
 
@@ -15,6 +14,13 @@ All notable changes to Guided Turns are documented here.
 
 - Group-chat support for Guided Impersonation, Guided Swipe, and Guided Revision.
 - Safe group-speaker resolution for recorded avatars and unambiguous legacy speaker names.
+
+## [0.5.3] - 2026-08-01
+
+### Fixed
+
+- Assemble Guided Impersonation, Guided Swipe, and Guided Revision prompts with the resolved Connection Manager profile's bound preset, instead of combining that profile's generation parameters with the currently selected SillyTavern preset's system prompts.
+- Restore live Chat Completion or Text Completion settings after prompt capture succeeds, fails, or is cancelled, without changing the visible preset selection.
 
 ## [0.5.2] - 2026-07-20
 
