@@ -41,6 +41,8 @@ SillyTavern/public/scripts/extensions/third-party/guided-turns
 
 Open **Extensions → Guided Turns**.
 
+![Guided Turns connection profile settings for Guided Impersonation, Guided Swipe, and Guided Revision](docs/screenshots/guided-turns-connection-profiles.png)
+
 1. Choose a profile for Guided Impersonation, Guided Swipe, and Guided Revision. Leave an action on **Use current Connection Manager profile** if it should follow the active profile.
 2. Choose first-, second-, or third-person narration for Guided Impersonation.
 3. Optionally open **Advanced prompts** to customize any action prompt. Each prompt has its own reset button, and **Reset All** restores every default.
