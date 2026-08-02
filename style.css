@@ -156,9 +156,18 @@
 }
 
 @media (max-width: 600px) {
+  #gt-action-bar {
+    flex-wrap: nowrap;
+  }
+
   .gt-action-button,
   .gt-action-button--tertiary {
-    flex: 1 1 calc(50% - 0.35rem);
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .gt-action-button > span {
+    display: none;
   }
 
   .gt-prompts-heading {

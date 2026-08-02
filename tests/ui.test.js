@@ -165,6 +165,7 @@ describe('action bar', () => {
         ]);
         expect(document.getElementById('gt-action-bar').getAttribute('aria-label')).toBe('Guided Turns actions');
         expect(document.getElementById('gt-impersonate').textContent).toContain('Guided Impersonation');
+        expect(document.getElementById('gt-impersonate').getAttribute('aria-label')).toBe('Guided Impersonation');
         const restoreButton = document.getElementById('gt-restore-impersonation');
         expect(restoreButton.hidden).toBe(true);
         expect(getComputedStyle(restoreButton).display).toBe('none');
@@ -185,6 +186,7 @@ describe('action bar', () => {
         expect(document.getElementById('gt-swipe').disabled).toBe(true);
         expect(document.getElementById('gt-revision').disabled).toBe(true);
         expect(document.getElementById('gt-impersonate').textContent).toContain('Cancel');
+        expect(document.getElementById('gt-impersonate').getAttribute('aria-label')).toBe('Cancel Impersonation');
         expect(document.getElementById('gt-impersonate').classList.contains('gt-is-cancelling')).toBe(true);
         document.getElementById('gt-impersonate').click();
         expect(onImpersonate).toHaveBeenCalledOnce();
