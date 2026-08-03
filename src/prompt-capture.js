@@ -80,6 +80,7 @@ export async function captureDryRunPrompt({
     quietPrompt = '',
     signal,
     timeoutMs = PROMPT_CAPTURE_TIMEOUT_MS,
+    includeChatHistory = true,
     groupTarget = null,
     ensureGroupTarget = () => {},
 }) {
@@ -94,6 +95,9 @@ export async function captureDryRunPrompt({
     const eventName = context.eventTypes.GENERATE_AFTER_DATA;
     const groupPromptContext = prepareGroupPromptContext({ context, target: groupTarget });
     const restoreGroupArrays = groupPromptContext.restore;
+    const liveChat = Array.isArray(context.chat) ? context.chat : null;
+    const chatSnapshot = includeChatHistory || !liveChat ? null : liveChat.slice();
+    let chatHistoryOmitted = false;
     const removeCombinationListeners = [];
     const ensureAtPromptCombination = () => ensureGroupTarget();
     const restoreAtPromptCombination = () => {
@@ -136,7 +140,13 @@ export async function captureDryRunPrompt({
     };
     if (groupTarget && Number.isInteger(groupTarget.id)) generationOptions.force_chid = groupTarget.id;
 
-    const generationPromise = Promise.resolve().then(() => context.generate(type, generationOptions, true));
+    const generationPromise = Promise.resolve().then(() => {
+        if (chatSnapshot) {
+            liveChat.splice(0, liveChat.length);
+            chatHistoryOmitted = true;
+        }
+        return context.generate(type, generationOptions, true);
+    });
     generationPromise.catch(() => {});
 
     try {
@@ -150,6 +160,7 @@ export async function captureDryRunPrompt({
     } finally {
         removeListener();
         for (const removeCombinationListener of removeCombinationListeners) removeCombinationListener();
+        if (chatHistoryOmitted) liveChat.splice(0, liveChat.length, ...chatSnapshot);
         restoreGroupArrays();
         clearTimeout(timer);
         signal?.removeEventListener('abort', abortHandler);

@@ -47,6 +47,7 @@ describe('settings', () => {
         expect(second.prompts.guidedSwipe).toBe(DEFAULT_PROMPTS.guidedSwipe);
         expect(second.profileIds.swipe).toBe(CURRENT_PROFILE);
         expect(second.profileIds.revision).toBe(CURRENT_PROFILE);
+        expect(second.includeRevisionChatHistory).toBe(true);
     });
 
     it('normalizes incomplete and invalid saved settings', () => {
@@ -57,6 +58,7 @@ describe('settings', () => {
         });
         expect(normalized).toEqual({
             debugMode: false,
+            includeRevisionChatHistory: true,
             profileIds: {
                 impersonate: 'profile-1',
                 swipe: CURRENT_PROFILE,
@@ -76,7 +78,7 @@ describe('settings', () => {
         const result = initializeSettings(container, EXTENSION_NAME);
         expect(result).toBe(original);
         expect(container[EXTENSION_NAME]).toBe(original);
-        expect(Object.keys(result).sort()).toEqual(['debugMode', 'perspective', 'profileIds', 'prompts']);
+        expect(Object.keys(result).sort()).toEqual(['debugMode', 'includeRevisionChatHistory', 'perspective', 'profileIds', 'prompts']);
         expect(result.profileIds).toEqual({
             impersonate: CURRENT_PROFILE,
             swipe: 'reroller',
@@ -102,6 +104,10 @@ describe('settings', () => {
             swipe: 'reroller',
             revision: 'editor',
         });
+    });
+
+    it('preserves the revision chat history preference', () => {
+        expect(normalizeSettings({ includeRevisionChatHistory: false }).includeRevisionChatHistory).toBe(false);
     });
 
     it('preserves customized and intentionally blank prompts', () => {

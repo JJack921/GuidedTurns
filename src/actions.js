@@ -36,7 +36,7 @@ function snapshotForDebug(value) {
     }
 }
 
-function logDebugRequest(settings, kind, profile, prompt) {
+function logDebugRequest(settings, kind, profile, presetName, prompt) {
     if (!settings.debugMode) return;
 
     console.log(`${EXTENSION_LOG_PREFIX} Debug profile for ${kind}:`, {
@@ -44,7 +44,7 @@ function logDebugRequest(settings, kind, profile, prompt) {
         name: profile?.name ?? '',
         api: profile?.api ?? '',
         model: profile?.model ?? '',
-        preset: profile?.preset ?? '',
+        preset: presetName ?? profile?.preset ?? '',
     });
     console.log(`${EXTENSION_LOG_PREFIX} Debug prompt for ${kind}:`, snapshotForDebug(prompt));
 }
@@ -151,7 +151,7 @@ export class GuidedActions {
             const groupId = groupIdentity(context);
             const source = composer.value;
             const settings = this.getSettings();
-            const { profile, mode, preset } = validateGuidedProfile(context, settings.profileIds.impersonate);
+            const { profile, mode, preset, presetName } = validateGuidedProfile(context, settings.profileIds.impersonate);
             const promptKey = PERSPECTIVE_PROMPT_KEYS[settings.perspective];
             const substituteParams = context.substituteParams || (value => value);
             const effectiveInput = source.trim()
@@ -187,7 +187,7 @@ export class GuidedActions {
                     ensureGroupTarget: () => groupScope?.ensureTarget(),
                 });
                 groupScope?.ensureTarget();
-                logDebugRequest(settings, 'impersonate', profile, prompt);
+                logDebugRequest(settings, 'impersonate', profile, presetName, prompt);
                 const result = await this.requestCompletion({ context, profile, prompt, signal });
                 const currentComposer = this.getComposer();
 
@@ -218,11 +218,13 @@ export class GuidedActions {
     }
 
     async guidedRevision() {
+        const settings = this.getSettings();
         await this.#guidedAssistantResponse({
             kind: 'revision',
             actionLabel: 'Guided Revision',
             profileKey: 'revision',
             requireGuidance: true,
+            includeChatHistory: settings.includeRevisionChatHistory,
             createQuietPrompt: ({ settings, guidance, sourceMessage, context }) => expandPromptTemplate(
                 settings.prompts.guidedRevision,
                 { input: guidance, message: sourceMessage },
@@ -236,6 +238,7 @@ export class GuidedActions {
         actionLabel,
         profileKey,
         requireGuidance = false,
+        includeChatHistory = true,
         createQuietPrompt,
     }) {
         if (this.cancelActive(kind)) return;
@@ -256,7 +259,7 @@ export class GuidedActions {
                     code: 'revision_guidance_required',
                 });
             }
-            const { profile, mode, preset } = validateGuidedProfile(context, settings.profileIds[profileKey]);
+            const { profile, mode, preset, presetName } = validateGuidedProfile(context, settings.profileIds[profileKey]);
             const messageIndex = context.chat.length - 1;
             const targetMessage = context.chat[messageIndex];
             if (!isSwipeableAssistantMessage(targetMessage)) {
@@ -301,6 +304,7 @@ export class GuidedActions {
                     type: 'swipe',
                     quietPrompt,
                     signal,
+                    includeChatHistory,
                     groupTarget,
                     ensureGroupTarget: () => groupScope?.ensureTarget(),
                 });
@@ -324,7 +328,7 @@ export class GuidedActions {
                 groupScope?.ensureTarget();
 
                 try {
-                    logDebugRequest(settings, kind, profile, prompt);
+                    logDebugRequest(settings, kind, profile, presetName, prompt);
                     await this.requestSwipeCompletion({
                         context,
                         profile,

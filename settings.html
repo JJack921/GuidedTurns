@@ -45,6 +45,15 @@
         </select>
       </section>
 
+      <section class="gt-settings-section" aria-labelledby="gt-revision-heading">
+        <h4 id="gt-revision-heading"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Guided Revision</h4>
+        <label for="gt-revision-include-chat-history">
+          <input id="gt-revision-include-chat-history" type="checkbox">
+          Include chat history with the request
+        </label>
+        <p class="gt-help">When disabled, the request includes the response being revised and the usual preset context, but omits earlier chat messages.</p>
+      </section>
+
       <section class="gt-settings-section" aria-labelledby="gt-debug-heading">
         <h4 id="gt-debug-heading"><i class="fa-solid fa-bug" aria-hidden="true"></i> Debugging</h4>
         <label for="gt-debug-mode">
@@ -61,7 +70,7 @@
         </div>
         <div class="inline-drawer-content">
           <div class="gt-prompts-heading">
-            <p class="gt-help">Use <code>{{input}}</code> for composer text. Guided Revision also supports <code>{{message}}</code>. Standard SillyTavern macros such as <code>{{user}}</code> and <code>{{char}}</code> are supported.</p>
+            <p class="gt-help">Use <code>{{input}}</code> for composer text. Guided Revision also supports <code>{{message}}</code>. Standard SillyTavern macros such as <code>&#123;&#123;user&#125;&#125;</code> and <code>&#123;&#123;char&#125;&#125;</code> are supported.</p>
             <button id="gt-reset-all-prompts" type="button" class="menu_button" title="Restore every advanced prompt to its default">Reset All</button>
           </div>
 

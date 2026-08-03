@@ -87,6 +87,7 @@ export const PERSPECTIVE_PROMPT_KEYS = Object.freeze({
 
 export const DEFAULT_SETTINGS = Object.freeze({
     debugMode: false,
+    includeRevisionChatHistory: true,
     profileIds: Object.freeze({
         impersonate: CURRENT_PROFILE,
         swipe: CURRENT_PROFILE,

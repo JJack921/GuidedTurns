@@ -75,6 +75,55 @@ describe('dry-run prompt capture', () => {
         await expect(captureDryRunPrompt({ context, type: 'swipe' })).rejects.toThrow('dry run failed');
         expect(eventSource.listeners.get('after-data')).toEqual([]);
     });
+
+    it('temporarily omits chat history and restores the original array after capture', async () => {
+        const eventSource = new EventSource();
+        const originalMessages = [{ mes: 'earlier' }, { mes: 'response to revise' }];
+        const chat = [...originalMessages];
+        const context = {
+            chat,
+            eventSource,
+            eventTypes: { GENERATE_AFTER_DATA: 'after-data' },
+            generate: vi.fn(async (_type, _options, dryRun) => {
+                expect(chat).toEqual([]);
+                await eventSource.emit('after-data', { prompt: ['preset context', 'response to revise'] }, dryRun);
+            }),
+        };
+
+        await expect(captureDryRunPrompt({
+            context,
+            type: 'swipe',
+            includeChatHistory: false,
+        })).resolves.toEqual(['preset context', 'response to revise']);
+
+        expect(context.chat).toBe(chat);
+        expect(chat).toEqual(originalMessages);
+    });
+
+    it('restores omitted chat history when capture is cancelled', async () => {
+        const eventSource = new EventSource();
+        const controller = new AbortController();
+        const chat = [{ mes: 'earlier' }, { mes: 'response to revise' }];
+        const context = {
+            chat,
+            eventSource,
+            eventTypes: { GENERATE_AFTER_DATA: 'after-data' },
+            generate: vi.fn(() => {
+                expect(chat).toEqual([]);
+                controller.abort();
+                return new Promise(() => {});
+            }),
+        };
+
+        await expect(captureDryRunPrompt({
+            context,
+            type: 'swipe',
+            signal: controller.signal,
+            includeChatHistory: false,
+        })).rejects.toMatchObject({ name: 'AbortError' });
+
+        expect(chat.map(message => message.mes)).toEqual(['earlier', 'response to revise']);
+    });
 });
 
 describe('preset-aware prompt capture', () => {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import { CURRENT_PROFILE, DEFAULT_PROMPTS, EXTENSION_DISPLAY_NAME } from './constants.js';
-import { describeProfile, getSupportedProfiles, isConnectionManagerDisabled } from './profiles.js';
+import { activePresetName, describeProfile, getSupportedProfiles, isConnectionManagerDisabled } from './profiles.js';
 import { resetAllPrompts, resetPrompt } from './settings.js';
 
 function option(document, value, label) {
@@ -17,6 +17,7 @@ export function mountSettingsUI({ document, context, settings, saveSettings, onS
 
     const profileSelects = [...root.querySelectorAll('select[data-profile-kind]')];
     const perspectiveSelect = root.querySelector('#gt-perspective');
+    const revisionHistoryToggle = root.querySelector('#gt-revision-include-chat-history');
     const debugModeToggle = root.querySelector('#gt-debug-mode');
 
     const updateProfileSummary = (profileKind, profiles) => {
@@ -49,7 +50,11 @@ export function mountSettingsUI({ document, context, settings, saveSettings, onS
             return;
         }
         const info = describeProfile(context, profile);
-        profileSummary.textContent = `${prefix}${info.name} · ${info.modeLabel} · ${info.api} · ${info.model} · Preset: ${info.preset}`;
+        const fallbackPreset = configuredProfileId === CURRENT_PROFILE && !profile.preset
+            ? activePresetName(context, info.mode)
+            : '';
+        const presetLabel = fallbackPreset ? `${fallbackPreset} (active fallback)` : info.preset;
+        profileSummary.textContent = `${prefix}${info.name} · ${info.modeLabel} · ${info.api} · ${info.model} · Preset: ${presetLabel}`;
     };
 
     const refreshProfiles = () => {
@@ -87,6 +92,12 @@ export function mountSettingsUI({ document, context, settings, saveSettings, onS
         settings.perspective = perspectiveSelect.value;
         saveSettings();
         onSettingsChanged();
+    });
+
+    revisionHistoryToggle.checked = settings.includeRevisionChatHistory;
+    revisionHistoryToggle.addEventListener('change', () => {
+        settings.includeRevisionChatHistory = revisionHistoryToggle.checked;
+        saveSettings();
     });
 
     debugModeToggle.checked = settings.debugMode;

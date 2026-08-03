@@ -58,6 +58,7 @@ function createHarness({
     };
     const settings = {
         debugMode: false,
+        includeRevisionChatHistory: true,
         profileIds: { impersonate: 'guided', swipe: 'guided', revision: 'guided' },
         perspective,
         prompts: {
@@ -568,6 +569,18 @@ describe('GuidedActions revision', () => {
         expect(harness.swipeSession.update).toHaveBeenCalledWith(expect.objectContaining({ text: 'generated output' }));
         expect(harness.swipeSession.commit).toHaveBeenCalledWith();
         expect(harness.notify.success).toHaveBeenCalledWith('Guided Revision added.');
+    });
+
+    it('omits earlier chat messages from prompt capture when history is disabled', async () => {
+        const harness = createHarness({ composerText: 'fix the tense' });
+        harness.settings.includeRevisionChatHistory = false;
+
+        await harness.actions.guidedRevision();
+
+        expect(harness.capturePrompt).toHaveBeenCalledWith(expect.objectContaining({
+            includeChatHistory: false,
+            quietPrompt: 'REVISE Alice [assistant reply] WITH [fix the tense]',
+        }));
     });
 
     it.each(['', '  \n'])('requires nonblank guidance %#', async composerText => {

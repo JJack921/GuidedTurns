@@ -2,6 +2,17 @@
 
 All notable changes to Guided Turns are documented here.
 
+## [0.6.2] - 2026-08-03
+
+### Added
+
+- Add a Guided Revision setting that can omit earlier chat history while retaining the response being revised and the usual preset context.
+
+### Fixed
+
+- Fall back to the active SillyTavern preset when **Use current Connection Manager profile** resolves to a profile without a bound preset.
+- Keep the literal `{{user}}` and `{{char}}` examples in Advanced prompts help text from being expanded by SillyTavern.
+
 ## [0.6.1] - 2026-08-02
 
 ### Fixed

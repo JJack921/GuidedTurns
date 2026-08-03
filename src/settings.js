@@ -11,6 +11,7 @@ const VALID_PERSPECTIVES = new Set(Object.values(PERSPECTIVES));
 export function createDefaultSettings() {
     return {
         debugMode: DEFAULT_SETTINGS.debugMode,
+        includeRevisionChatHistory: DEFAULT_SETTINGS.includeRevisionChatHistory,
         profileIds: { ...DEFAULT_SETTINGS.profileIds },
         perspective: DEFAULT_SETTINGS.perspective,
         prompts: { ...DEFAULT_PROMPTS },
@@ -25,6 +26,9 @@ export function normalizeSettings(value) {
 
     return {
         debugMode: typeof source.debugMode === 'boolean' ? source.debugMode : defaults.debugMode,
+        includeRevisionChatHistory: typeof source.includeRevisionChatHistory === 'boolean'
+            ? source.includeRevisionChatHistory
+            : defaults.includeRevisionChatHistory,
         profileIds: Object.fromEntries(Object.entries(defaults.profileIds).map(([key, fallback]) => [
             key,
             typeof sourceProfileIds[key] === 'string' && sourceProfileIds[key] ? sourceProfileIds[key] : fallback,

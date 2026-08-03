@@ -20,6 +20,7 @@ function settingsMarkup() {
                 <option value="second">Second</option>
                 <option value="third">Third</option>
             </select>
+            <input id="gt-revision-include-chat-history" type="checkbox">
             <input id="gt-debug-mode" type="checkbox">
             ${Object.keys(DEFAULT_PROMPTS).map(key => `
                 <textarea data-prompt-key="${key}"></textarea>
@@ -32,6 +33,8 @@ function settingsMarkup() {
 
 function profileContext(profiles) {
     return {
+        chatCompletionSettings: { preset_settings_openai: 'Active Chat Preset' },
+        textCompletionSettings: { preset: 'Active Text Preset' },
         extensionSettings: {
             disabledExtensions: [],
             connectionManager: { selectedProfile: profiles.find(profile => profile.id === 'chat')?.id ?? profiles[0]?.id ?? null },
@@ -112,6 +115,32 @@ describe('settings UI', () => {
         expect(saveSettings).toHaveBeenCalledOnce();
     });
 
+    it('shows the active preset fallback for an unbound current profile', () => {
+        const settings = createDefaultSettings();
+        const context = profileContext([
+            { id: 'chat', name: 'Flexible Chat', api: 'openrouter', model: 'remote', preset: '' },
+        ]);
+
+        mountSettingsUI({ document, context, settings, saveSettings: vi.fn() });
+
+        expect(document.getElementById('gt-profile-revision-summary').textContent)
+            .toContain('Preset: Active Chat Preset (active fallback)');
+    });
+
+    it('persists the Guided Revision chat history toggle', () => {
+        const settings = createDefaultSettings();
+        const saveSettings = vi.fn();
+        mountSettingsUI({ document, context: profileContext([]), settings, saveSettings });
+        const toggle = document.getElementById('gt-revision-include-chat-history');
+
+        expect(toggle.checked).toBe(true);
+        toggle.checked = false;
+        toggle.dispatchEvent(new Event('change'));
+
+        expect(settings.includeRevisionChatHistory).toBe(false);
+        expect(saveSettings).toHaveBeenCalledOnce();
+    });
+
     it('resets individual and all prompts', () => {
         const settings = createDefaultSettings();
         const saveSettings = vi.fn();
@@ -133,14 +162,18 @@ describe('settings UI', () => {
 
     it('groups the refreshed settings and places prompt controls in an advanced drawer', async () => {
         const html = await readFile(`${process.cwd()}/settings.html`, 'utf8');
+        expect(html).toContain('<code>&#123;&#123;user&#125;&#125;</code>');
+        expect(html).toContain('<code>&#123;&#123;char&#125;&#125;</code>');
         document.body.innerHTML = html;
         const root = document.getElementById('gt-settings');
         const drawer = root.querySelector('.gt-prompts-drawer');
-        expect(root.querySelectorAll('.gt-settings-section')).toHaveLength(3);
+        expect(root.querySelectorAll('.gt-settings-section')).toHaveLength(4);
         expect(drawer.classList.contains('inline-drawer')).toBe(true);
         expect(drawer.querySelector('.inline-drawer-toggle').textContent).toContain('Advanced prompts');
         expect(drawer.querySelectorAll('.gt-reset-prompt')).toHaveLength(Object.keys(DEFAULT_PROMPTS).length);
         expect(drawer.querySelector('#gt-reset-all-prompts')).not.toBeNull();
+        expect(drawer.querySelector('.gt-prompts-heading .gt-help').textContent)
+            .toContain('Standard SillyTavern macros such as {{user}} and {{char}} are supported.');
     });
 });
 

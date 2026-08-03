@@ -21,6 +21,8 @@ function makeContext({
     };
     return {
         mainApi,
+        chatCompletionSettings: { preset_settings_openai: 'Current Chat Preset' },
+        textCompletionSettings: { preset: 'Current Text Preset' },
         extensionSettings: {
             disabledExtensions: disabled ? ['connection-manager'] : [],
             connectionManager: { selectedProfile: profile?.id ?? null },
@@ -51,6 +53,19 @@ describe('guided profile validation', () => {
         context.extensionSettings.connectionManager.selectedProfile = null;
         expect(() => validateGuidedProfile(context, CURRENT_PROFILE))
             .toThrow(expect.objectContaining({ code: 'current_profile_required' }));
+    });
+
+    it('falls back to the active preset when the current profile has no bound preset', () => {
+        const context = makeContext({
+            profile: { id: 'guided', name: 'Guided', api: 'openrouter', model: 'm', preset: '' },
+        });
+
+        const result = validateGuidedProfile(context, CURRENT_PROFILE);
+
+        expect(result.presetName).toBe('Current Chat Preset');
+        expect(context.getPresetManager).toHaveBeenCalledWith('openai');
+        expect(context.getPresetManager.mock.results[0].value.getCompletionPresetByName)
+            .toHaveBeenCalledWith('Current Chat Preset');
     });
 
     it.each([

@@ -16,7 +16,7 @@ Each action can use the active Connection Manager profile or its own dedicated p
 
 - SillyTavern **1.18.0 or newer**.
 - The built-in **Connection Manager** extension enabled.
-- A Connection Manager profile with a bound generation preset.
+- A Connection Manager profile with a bound generation preset, or an active SillyTavern preset when using the current profile.
 - A single-character or group chat with at least one valid group member.
 
 The selected guided profile must use the same completion mode as the current chat: Chat Completion profiles for Chat Completion chats, and Text Completion profiles for Text Completion chats.
@@ -45,7 +45,8 @@ Open **Extensions → Guided Turns**.
 
 1. Choose a profile for Guided Impersonation, Guided Swipe, and Guided Revision. Leave an action on **Use current Connection Manager profile** if it should follow the active profile.
 2. Choose first-, second-, or third-person narration for Guided Impersonation.
-3. Optionally open **Advanced prompts** to customize any action prompt. Each prompt has its own reset button, and **Reset All** restores every default.
+3. Choose whether Guided Revision should include chat history with its request. This is enabled by default.
+4. Optionally open **Advanced prompts** to customize any action prompt. Each prompt has its own reset button, and **Reset All** restores every default.
 
 Profile summaries show the resolved profile, completion mode, API, model, and preset. Missing, unsupported, or disabled profiles are reported before generation begins.
 
@@ -85,11 +86,13 @@ keep the dialogue, but change the narration to past tense
 
 Select **Guided Revision**. The latest assistant response is supplied to the revision prompt and the replacement streams into a new Swipe. The composer instruction is required and is not cleared.
 
+Disable **Include chat history with the request** to omit earlier turns. The response being revised remains in the revision prompt, together with the usual preset, character, persona, and lore context.
+
 In a group chat, Guided Swipe and Guided Revision use the latest response's recorded speaker avatar. Legacy messages without that metadata are accepted only when their speaker name uniquely identifies a current group member.
 
 ## Profiles, prompts, and perspectives
 
-The three actions have independent profile settings. A dedicated profile is useful when you want a smaller model for drafting, a more precise model for revision, or different presets for user and assistant turns. Guided Turns uses the resolved profile's bound preset both to assemble the prompt (including its system-prompt templates and prompt order) and to set generation parameters. It restores the active SillyTavern preset settings immediately after prompt assembly, without changing the visible preset selection. **Use current** resolves the Connection Manager selection when the action starts and uses that profile's bound preset in the same way.
+The three actions have independent profile settings. A dedicated profile is useful when you want a smaller model for drafting, a more precise model for revision, or different presets for user and assistant turns. Guided Turns uses the resolved profile's bound preset both to assemble the prompt (including its system-prompt templates and prompt order) and to set generation parameters. It restores the active SillyTavern preset settings immediately after prompt assembly, without changing the visible preset selection. **Use current** resolves the Connection Manager selection when the action starts. If that profile has no bound preset, Guided Turns falls back to the active SillyTavern preset.
 
 Guided Impersonation supports:
 
@@ -119,7 +122,7 @@ Open Connection Manager and confirm that the selected profile still exists and t
 
 **The profile has no preset**
 
-Edit the Connection Manager profile and bind a generation preset. Guided Turns uses the profile's preset prompt templates while assembling the request and includes its generation preset and instruct settings when sending it.
+Dedicated guided profiles require a bound generation preset. Bind one in Connection Manager, or select **Use current Connection Manager profile** to fall back to the active SillyTavern preset when the current profile has none.
 
 **The completion modes do not match**
 

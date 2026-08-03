@@ -24,6 +24,13 @@ export function profileCompletionMode(context, profile) {
     return null;
 }
 
+export function activePresetName(context, mode) {
+    const value = mode === COMPLETION_MODES.CHAT
+        ? context?.chatCompletionSettings?.preset_settings_openai
+        : context?.textCompletionSettings?.preset;
+    return typeof value === 'string' ? value.trim() : '';
+}
+
 export function getSupportedProfiles(context) {
     if (isConnectionManagerDisabled(context)) return [];
     const service = context?.ConnectionManagerRequestService;
@@ -99,18 +106,21 @@ export function validateGuidedProfile(context, configuredProfileId) {
         );
     }
 
-    if (!profile.preset) {
+    const usesCurrentProfile = configuredProfileId === CURRENT_PROFILE;
+    const boundPresetName = typeof profile.preset === 'string' ? profile.preset.trim() : '';
+    const presetName = boundPresetName || (usesCurrentProfile ? activePresetName(context, targetMode) : '');
+    if (!presetName) {
         throw new GuidedError('The selected guided profile has no bound generation preset.', { code: 'preset_required' });
     }
 
     const presetManagerId = targetMode === COMPLETION_MODES.CHAT ? 'openai' : 'textgenerationwebui';
     const presetManager = context?.getPresetManager?.(presetManagerId);
-    const preset = presetManager?.getCompletionPresetByName?.(profile.preset);
+    const preset = presetManager?.getCompletionPresetByName?.(presetName);
     if (!preset) {
-        throw new GuidedError(`The guided profile's preset “${profile.preset}” could not be found. Update the profile or choose another one.`, {
+        throw new GuidedError(`The guided profile's preset “${presetName}” could not be found. Update the profile or choose another one.`, {
             code: 'preset_missing',
         });
     }
 
-    return { profile, profileId, mode: targetMode, preset };
+    return { profile, profileId, mode: targetMode, preset, presetName };
 }

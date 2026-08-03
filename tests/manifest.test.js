@@ -12,7 +12,7 @@ describe('extension manifest', () => {
             js: 'index.js',
             css: 'style.css',
             author: 'JJack921',
-            version: '0.6.1',
+            version: '0.6.2',
             minimum_client_version: '1.18.0',
             manifest_version: 3,
             homePage: 'https://github.com/JJack921/GuidedTurns',
@@ -23,7 +23,7 @@ describe('extension manifest', () => {
     it('declares consistent MIT package and source metadata', async () => {
         const packageJson = JSON.parse(await readFile(`${process.cwd()}/package.json`, 'utf8'));
         const license = await readFile(`${process.cwd()}/LICENSE`, 'utf8');
-        expect(packageJson).toMatchObject({ name: 'guided-turns', version: '0.6.1', license: 'MIT' });
+        expect(packageJson).toMatchObject({ name: 'guided-turns', version: '0.6.2', license: 'MIT' });
         expect(license).toContain('MIT License');
         expect(license).toContain('Copyright (c) 2026 JJack921');
     });
