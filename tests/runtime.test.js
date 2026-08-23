@@ -11,6 +11,10 @@ describe('extension runtime', () => {
 
     afterEach(() => observer?.disconnect());
 
+    async function flushMutations() {
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
     it.each(['guided-impersonation', 'guided-turns', 'custom-fork-name'])(
         'resolves templates from the installed %s directory',
         directory => {
@@ -78,5 +82,63 @@ describe('extension runtime', () => {
 
         document.getElementById('gt-revision').click();
         expect(guidedRevision).toHaveBeenCalledOnce();
+    });
+
+    it('releases native busy state when SillyBunny unlocks after companion generation', async () => {
+        const settingsHtml = await readFile(`${process.cwd()}/settings.html`, 'utf8');
+        document.body.innerHTML = `
+            <div id="extensions_settings"></div>
+            <form id="send_form">
+                <div id="nonQRFormItems"></div>
+                <textarea id="send_textarea"></textarea>
+            </form>
+        `;
+
+        const handlers = new Map();
+        const context = {
+            ConnectionManagerRequestService: {
+                getSupportedProfiles: vi.fn(() => []),
+            },
+            eventSource: {
+                on: vi.fn((eventName, handler) => handlers.set(eventName, handler)),
+            },
+            eventTypes: {
+                GENERATION_STARTED: 'generation_started',
+                GENERATION_ENDED: 'generation_ended',
+            },
+            extensionSettings: {
+                connectionManager: { selectedProfile: null },
+                disabledExtensions: [],
+            },
+            renderExtensionTemplateAsync: vi.fn(() => settingsHtml),
+        };
+        vi.spyOn(console, 'info').mockImplementation(() => {});
+
+        ({ observer } = await initializeExtension({
+            extensionSettings: {},
+            saveSettings: vi.fn(),
+            core: {},
+            getContext: () => context,
+            document,
+        }));
+
+        handlers.get('generation_started')('quiet', {}, false);
+        expect(document.getElementById('gt-impersonate').disabled).toBe(true);
+        expect(document.getElementById('gt-swipe').disabled).toBe(true);
+        expect(document.getElementById('gt-revision').disabled).toBe(true);
+
+        document.body.dataset.generating = 'true';
+        document.getElementById('send_form').classList.add('sb-generating-controls');
+        await flushMutations();
+
+        delete document.body.dataset.generating;
+        await flushMutations();
+        expect(document.getElementById('gt-impersonate').disabled).toBe(true);
+
+        document.getElementById('send_form').classList.remove('sb-generating-controls');
+        await flushMutations();
+        expect(document.getElementById('gt-impersonate').disabled).toBe(false);
+        expect(document.getElementById('gt-swipe').disabled).toBe(false);
+        expect(document.getElementById('gt-revision').disabled).toBe(false);
     });
 });

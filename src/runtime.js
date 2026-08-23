@@ -42,6 +42,22 @@ function subscribe(eventSource, eventName, handler) {
     if (eventName) eventSource?.on?.(eventName, handler);
 }
 
+function isNativeGenerationBusy(document) {
+    return document.body?.dataset?.generating === 'true' ||
+        document.getElementById('send_form')?.classList.contains('sb-generating-controls');
+}
+
+function changedNativeGenerationLock(records, document) {
+    const sendForm = document.getElementById('send_form');
+    return records.some(record =>
+        record.type === 'attributes' &&
+        (
+            (record.target === document.body && record.attributeName === 'data-generating') ||
+            (record.target === sendForm && record.attributeName === 'class')
+        ),
+    );
+}
+
 export async function initializeExtension({
     extensionSettings,
     saveSettings,
@@ -86,10 +102,18 @@ export async function initializeExtension({
     });
 
     ensureActionUi();
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver(records => {
         if (!document.getElementById('gt-action-bar') && document.getElementById('send_form')) ensureActionUi();
+        if (changedNativeGenerationLock(records, document)) {
+            actions.setNativeBusy(isNativeGenerationBusy(document));
+        }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-generating'],
+        childList: true,
+        subtree: true,
+    });
 
     const { eventSource, eventTypes } = context;
     subscribe(eventSource, eventTypes?.GENERATION_STARTED, (_type, _options, dryRun) => {

@@ -2,6 +2,12 @@
 
 All notable changes to Guided Turns are documented here.
 
+## [0.6.3] - 2026-08-23
+
+### Fixed
+
+- Release Guided Turns action buttons when SillyBunny finishes Tracker Companion generation through its native UI recovery path without a matching generation-ended event.
+
 ## [0.6.2] - 2026-08-03
 
 ### Added

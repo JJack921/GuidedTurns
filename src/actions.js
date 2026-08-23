@@ -88,7 +88,10 @@ export class GuidedActions {
     }
 
     setNativeBusy(value) {
-        this.nativeBusy = Boolean(value);
+        const nativeBusy = Boolean(value);
+        if (this.nativeBusy === nativeBusy) return;
+
+        this.nativeBusy = nativeBusy;
         this.onStateChange(this.getState());
     }
 
