@@ -116,19 +116,53 @@ describe('live settings requests', () => {
         const onProgress = vi.fn();
         const request = stream ? streamGuidedCompletion : sendGuidedCompletion;
         await request({ context, profile: { id: 'current', model: 'profile-model' }, prompt,
-            mode, useLiveSettings: true, getResponseLength: () => 456, onProgress });
+            mode, useLiveSettings: true, getResponseLength: () => 456, getLiveModel: () => 'live-model', onProgress });
         expect(converter).toHaveBeenCalledWith(mode === 'chat'
             ? { bias_presets: { Custom: [] }, bias_preset_selected: 'Custom' }
             : { genamt: 456 }, {}, {
-            model: 'profile-model', [mode === 'chat' ? 'messages' : 'prompt']: prompt,
+            model: 'live-model', [mode === 'chat' ? 'messages' : 'prompt']: prompt,
         });
         expect(sendRequest).toHaveBeenCalledWith('current', prompt, undefined, {
             stream, signal: undefined, extractData: true, includePreset: false, includeInstruct: false,
         }, {
-            model: 'profile-model', [mode === 'chat' ? 'messages' : 'prompt']: prompt,
+            model: 'live-model', [mode === 'chat' ? 'messages' : 'prompt']: prompt,
             temperature: 0.37, max_tokens: mode === 'chat' ? 321 : 456, stream,
         });
         if (stream) expect(onProgress).toHaveBeenCalledOnce();
+    });
+
+    it.each([sendGuidedCompletion, streamGuidedCompletion])('reads unsaved model changes on each request', async request => {
+        let liveModel = 'first-model';
+        const sendRequest = vi.fn().mockResolvedValue({ content: 'result' });
+        const getLiveModel = vi.fn(() => liveModel);
+        const context = {
+            ConnectionManagerRequestService: { sendRequest },
+            chatCompletionSettings: {},
+            ChatCompletionService: {
+                presetToGeneratePayload: vi.fn(async (_preset, _overrides, input) => ({ ...input })),
+            },
+        };
+        const profile = { id: 'current', model: 'glm-5.3-exl3' };
+        const options = { context, profile, prompt: [], mode: 'chat', useLiveSettings: true, getLiveModel };
+        await request(options);
+        liveModel = 'new-served-model';
+        await request(options);
+        expect(sendRequest.mock.calls.map(call => call[4].model)).toEqual(['first-model', 'new-served-model']);
+        expect(getLiveModel).toHaveBeenCalledWith('chat');
+        expect(profile.model).toBe('glm-5.3-exl3');
+    });
+
+    it('rejects missing live model selection instead of using the saved model', async () => {
+        const sendRequest = vi.fn();
+        await expect(sendGuidedCompletion({
+            context: {
+                ConnectionManagerRequestService: { sendRequest },
+                ChatCompletionService: { presetToGeneratePayload: vi.fn() },
+            },
+            profile: { id: 'current', model: 'old-model' }, mode: 'chat', prompt: [], useLiveSettings: true,
+            getLiveModel: () => '',
+        })).rejects.toMatchObject({ code: 'live_model_unavailable' });
+        expect(sendRequest).not.toHaveBeenCalled();
     });
 
     it('reports unsupported live conversion without sending a request or falling back to saved settings', async () => {
@@ -145,7 +179,7 @@ describe('live settings requests', () => {
         const converter = vi.fn();
         await expect(sendGuidedCompletion({
             context: { ConnectionManagerRequestService: { sendRequest }, TextCompletionService: { presetToGeneratePayload: converter } },
-            profile: { id: 'current' }, mode: 'text', prompt: 'prompt', useLiveSettings: true,
+            profile: { id: 'current' }, mode: 'text', prompt: 'prompt', useLiveSettings: true, getLiveModel: () => 'live-model',
         })).rejects.toMatchObject({ code: 'live_settings_unavailable' });
         expect(converter).not.toHaveBeenCalled();
         expect(sendRequest).not.toHaveBeenCalled();

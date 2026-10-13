@@ -190,10 +190,12 @@ export class GuidedActions {
                     ensureGroupTarget: () => groupScope?.ensureTarget(),
                 });
                 groupScope?.ensureTarget();
-                logDebugRequest(settings, 'impersonate', profile, presetName, prompt);
+                logDebugRequest(settings, 'impersonate', useLiveSettings
+                    ? { ...profile, model: this.core?.getLiveModel?.(mode) } : profile, presetName, prompt);
                 const result = await this.requestCompletion({
                     context, profile, prompt, signal, mode, useLiveSettings,
                     getResponseLength: this.core?.getResponseLength,
+                    getLiveModel: this.core?.getLiveModel,
                 });
                 const currentComposer = this.getComposer();
 
@@ -334,7 +336,8 @@ export class GuidedActions {
                 groupScope?.ensureTarget();
 
                 try {
-                    logDebugRequest(settings, kind, profile, presetName, prompt);
+                    logDebugRequest(settings, kind, useLiveSettings
+                        ? { ...profile, model: this.core?.getLiveModel?.(mode) } : profile, presetName, prompt);
                     await this.requestSwipeCompletion({
                         context,
                         profile,
@@ -343,6 +346,7 @@ export class GuidedActions {
                         mode,
                         useLiveSettings,
                         getResponseLength: this.core?.getResponseLength,
+                        getLiveModel: this.core?.getLiveModel,
                         onProgress: chunk => session.update(chunk),
                     });
                 } catch (error) {

@@ -2,6 +2,13 @@
 
 All notable changes to Guided Turns are documented here.
 
+## [0.6.5] - 2026-10-13
+
+### Fixed
+
+- Use the live model selection, including unsaved changes, for current-profile Guided Impersonation, Swipe, and Revision requests instead of the model saved in Connection Manager. Dedicated profiles retain their saved model.
+- Show live-model usage in current-profile summaries and report the live model in debug output.
+
 ## [0.6.4] - 2026-10-13
 
 ### Fixed

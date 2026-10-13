@@ -12,6 +12,8 @@ import {
     setCharacterName,
     syncMesToSwipe,
 } from '../../../../script.js';
+import { getChatCompletionModel } from '../../../openai.js';
+import { getTextGenModel } from '../../../textgen-settings.js';
 import { ReasoningHandler } from '../../../reasoning.js';
 import { EXTENSION_DISPLAY_NAME, EXTENSION_LOG_PREFIX } from './src/constants.js';
 import { initializeExtension } from './src/runtime.js';
@@ -22,6 +24,7 @@ async function init() {
             extensionSettings: extension_settings,
             saveSettings: saveSettingsDebounced,
             core: {
+                getLiveModel: mode => mode === 'chat' ? getChatCompletionModel() : getTextGenModel(),
                 getResponseLength: () => Number(amount_gen),
                 addOneMessage,
                 cleanUpMessage,

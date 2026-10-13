@@ -207,6 +207,7 @@ describe('GuidedActions impersonation', () => {
     ])('preserves live settings for current-profile %s', async (kind, action, request) => {
         const harness = createHarness();
         harness.settings.profileIds[kind] = CURRENT_PROFILE;
+        harness.actions.core.getLiveModel = vi.fn(() => 'unsaved-model');
         harness.capturePrompt.mockImplementation(async ({ context }) => {
             expect(context.chatCompletionSettings.prompts[0].identifier).toBe('current');
             return ['captured prompt'];
@@ -215,7 +216,7 @@ describe('GuidedActions impersonation', () => {
         await harness.actions[action]();
 
         expect(harness.context.ConnectionManagerRequestService.getProfile).toHaveBeenCalledWith('guided');
-        expect(harness[request]).toHaveBeenCalledWith(expect.objectContaining({ profile: harness.profile, mode: 'chat', useLiveSettings: true }));
+        expect(harness[request]).toHaveBeenCalledWith(expect.objectContaining({ profile: harness.profile, mode: 'chat', useLiveSettings: true, getLiveModel: harness.actions.core.getLiveModel }));
         expect(harness.context.chatCompletionSettings.prompts[0].identifier).toBe('current');
     });
 

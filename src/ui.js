@@ -54,7 +54,7 @@ export function mountSettingsUI({ document, context, settings, saveSettings, onS
         const presetLabel = configuredProfileId === CURRENT_PROFILE
             ? (livePreset ? `Live settings (${livePreset})` : 'Live settings')
             : info.preset;
-        profileSummary.textContent = `${prefix}${info.name} · ${info.modeLabel} · ${info.api} · ${info.model} · Preset: ${presetLabel}`;
+        profileSummary.textContent = `${prefix}${info.name} · ${info.modeLabel} · ${info.api} · ${configuredProfileId === CURRENT_PROFILE ? 'Live model' : info.model} · Preset: ${presetLabel}`;
     };
 
     const refreshProfiles = () => {

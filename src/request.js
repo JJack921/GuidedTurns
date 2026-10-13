@@ -26,12 +26,18 @@ function createRequestOptions({ stream, signal, useLiveSettings }) {
     };
 }
 
-async function createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength }) {
+async function createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength, getLiveModel }) {
     if (!useLiveSettings) return undefined;
     const service = mode === 'chat' ? context.ChatCompletionService : context.TextCompletionService;
     if (!service?.presetToGeneratePayload) {
         throw new GuidedError('This SillyTavern version does not expose live completion payload conversion.', {
             code: 'live_settings_unavailable',
+        });
+    }
+    const model = getLiveModel?.(mode);
+    if (typeof model !== 'string' || !model.trim()) {
+        throw new GuidedError('The live model selection is unavailable. Select a model before generating.', {
+            code: 'live_model_unavailable',
         });
     }
     // Convert live settings without loading a saved preset.
@@ -42,7 +48,7 @@ async function createLivePayload({ context, profile, prompt, mode, useLiveSettin
         payload = await service.presetToGeneratePayload({
             bias_presets: settings?.bias_presets ?? {},
             bias_preset_selected: settings?.bias_preset_selected,
-        }, {}, { model: profile.model, messages: prompt });
+        }, {}, { model, messages: prompt });
     } else {
         const responseLength = getResponseLength?.();
         if (!Number.isFinite(responseLength) || responseLength <= 0) {
@@ -50,7 +56,7 @@ async function createLivePayload({ context, profile, prompt, mode, useLiveSettin
                 code: 'live_settings_unavailable',
             });
         }
-        payload = await service.presetToGeneratePayload({ genamt: responseLength }, {}, { model: profile.model, prompt });
+        payload = await service.presetToGeneratePayload({ genamt: responseLength }, {}, { model, prompt });
     }
     // Connection Manager remains responsible for the resolved profile's routing.
     for (const key of ['chat_completion_source', 'api_type', 'api_server', 'secret_id',
@@ -69,9 +75,9 @@ function convertRequestError(error, signal) {
     });
 }
 
-export async function sendGuidedCompletion({ context, profile, prompt, signal, mode, useLiveSettings = false, getResponseLength }) {
+export async function sendGuidedCompletion({ context, profile, prompt, signal, mode, useLiveSettings = false, getResponseLength, getLiveModel }) {
     try {
-        const payload = await createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength });
+        const payload = await createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength, getLiveModel });
         const result = await context.ConnectionManagerRequestService.sendRequest(
             profile.id,
             prompt,
@@ -89,11 +95,11 @@ export async function sendGuidedCompletion({ context, profile, prompt, signal, m
     }
 }
 
-export async function streamGuidedCompletion({ context, profile, prompt, signal, mode, useLiveSettings = false, getResponseLength, onProgress = () => {} }) {
+export async function streamGuidedCompletion({ context, profile, prompt, signal, mode, useLiveSettings = false, getResponseLength, getLiveModel, onProgress = () => {} }) {
     let latest = { text: '', reasoning: '', signature: null };
 
     try {
-        const payload = await createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength });
+        const payload = await createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength, getLiveModel });
         const response = await context.ConnectionManagerRequestService.sendRequest(
             profile.id,
             prompt,
