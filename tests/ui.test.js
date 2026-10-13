@@ -115,7 +115,7 @@ describe('settings UI', () => {
         expect(saveSettings).toHaveBeenCalledOnce();
     });
 
-    it('shows the active preset fallback for an unbound current profile', () => {
+    it('shows live settings for an unbound current profile', () => {
         const settings = createDefaultSettings();
         const context = profileContext([
             { id: 'chat', name: 'Flexible Chat', api: 'openrouter', model: 'remote', preset: '' },
@@ -124,7 +124,7 @@ describe('settings UI', () => {
         mountSettingsUI({ document, context, settings, saveSettings: vi.fn() });
 
         expect(document.getElementById('gt-profile-revision-summary').textContent)
-            .toContain('Preset: Active Chat Preset (active fallback)');
+            .toContain('Preset: Live settings (Active Chat Preset)');
     });
 
     it('persists the Guided Revision chat history toggle', () => {

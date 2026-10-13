@@ -89,3 +89,65 @@ describe('streamed guided request', () => {
         expect(empty).toHaveBeenCalledOnce();
     });
 });
+
+
+describe('live settings requests', () => {
+    it.each([
+        ['chat', false], ['chat', true], ['text', false], ['text', true],
+    ])('uses live %s parameters with streaming=%s', async (mode, stream) => {
+        const prompt = mode === 'chat' ? [{ role: 'user', content: 'guide' }] : 'assembled instruct prompt';
+        const converter = vi.fn((preset, _overrides, input) => ({
+            ...input,
+            temperature: 0.37,
+            max_tokens: mode === 'chat' ? 321 : preset.genamt,
+            api_server: 'live-server',
+            chat_completion_source: 'live-source',
+            custom_prompt_post_processing: 'live-processing',
+            reverse_proxy: 'live-proxy',
+            secret_id: 'live-secret',
+        }));
+        const sendRequest = vi.fn().mockResolvedValue({ content: 'result' });
+        const context = {
+            ConnectionManagerRequestService: { sendRequest },
+            chatCompletionSettings: { bias_presets: { Custom: [] }, bias_preset_selected: 'Custom' },
+            ChatCompletionService: { presetToGeneratePayload: converter },
+            TextCompletionService: { presetToGeneratePayload: converter },
+        };
+        const onProgress = vi.fn();
+        const request = stream ? streamGuidedCompletion : sendGuidedCompletion;
+        await request({ context, profile: { id: 'current', model: 'profile-model' }, prompt,
+            mode, useLiveSettings: true, getResponseLength: () => 456, onProgress });
+        expect(converter).toHaveBeenCalledWith(mode === 'chat'
+            ? { bias_presets: { Custom: [] }, bias_preset_selected: 'Custom' }
+            : { genamt: 456 }, {}, {
+            model: 'profile-model', [mode === 'chat' ? 'messages' : 'prompt']: prompt,
+        });
+        expect(sendRequest).toHaveBeenCalledWith('current', prompt, undefined, {
+            stream, signal: undefined, extractData: true, includePreset: false, includeInstruct: false,
+        }, {
+            model: 'profile-model', [mode === 'chat' ? 'messages' : 'prompt']: prompt,
+            temperature: 0.37, max_tokens: mode === 'chat' ? 321 : 456, stream,
+        });
+        if (stream) expect(onProgress).toHaveBeenCalledOnce();
+    });
+
+    it('reports unsupported live conversion without sending a request or falling back to saved settings', async () => {
+        const sendRequest = vi.fn();
+        await expect(sendGuidedCompletion({
+            context: { ConnectionManagerRequestService: { sendRequest } },
+            profile: { id: 'current' }, mode: 'chat', prompt: [], useLiveSettings: true,
+        })).rejects.toMatchObject({ code: 'live_settings_unavailable' });
+        expect(sendRequest).not.toHaveBeenCalled();
+    });
+
+    it('requires the live text response length', async () => {
+        const sendRequest = vi.fn();
+        const converter = vi.fn();
+        await expect(sendGuidedCompletion({
+            context: { ConnectionManagerRequestService: { sendRequest }, TextCompletionService: { presetToGeneratePayload: converter } },
+            profile: { id: 'current' }, mode: 'text', prompt: 'prompt', useLiveSettings: true,
+        })).rejects.toMatchObject({ code: 'live_settings_unavailable' });
+        expect(converter).not.toHaveBeenCalled();
+        expect(sendRequest).not.toHaveBeenCalled();
+    });
+});

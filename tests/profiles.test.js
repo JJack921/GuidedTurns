@@ -55,17 +55,17 @@ describe('guided profile validation', () => {
             .toThrow(expect.objectContaining({ code: 'current_profile_required' }));
     });
 
-    it('falls back to the active preset when the current profile has no bound preset', () => {
+    it.each(['', 'Missing Preset', 'Guided Preset'])('uses live settings without looking up the saved preset %s', boundPreset => {
         const context = makeContext({
-            profile: { id: 'guided', name: 'Guided', api: 'openrouter', model: 'm', preset: '' },
+            profile: { id: 'guided', name: 'Guided', api: 'openrouter', model: 'm', preset: boundPreset },
+            preset: null,
         });
-
-        const result = validateGuidedProfile(context, CURRENT_PROFILE);
-
-        expect(result.presetName).toBe('Current Chat Preset');
-        expect(context.getPresetManager).toHaveBeenCalledWith('openai');
-        expect(context.getPresetManager.mock.results[0].value.getCompletionPresetByName)
-            .toHaveBeenCalledWith('Current Chat Preset');
+        expect(validateGuidedProfile(context, CURRENT_PROFILE)).toMatchObject({
+            presetName: 'Live settings (Current Chat Preset)',
+            preset: null,
+            useLiveSettings: true,
+        });
+        expect(context.getPresetManager).not.toHaveBeenCalled();
     });
 
     it.each([

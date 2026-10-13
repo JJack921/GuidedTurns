@@ -154,7 +154,7 @@ export class GuidedActions {
             const groupId = groupIdentity(context);
             const source = composer.value;
             const settings = this.getSettings();
-            const { profile, mode, preset, presetName } = validateGuidedProfile(context, settings.profileIds.impersonate);
+            const { profile, mode, preset, presetName, useLiveSettings } = validateGuidedProfile(context, settings.profileIds.impersonate);
             const promptKey = PERSPECTIVE_PROMPT_KEYS[settings.perspective];
             const substituteParams = context.substituteParams || (value => value);
             const effectiveInput = source.trim()
@@ -191,7 +191,10 @@ export class GuidedActions {
                 });
                 groupScope?.ensureTarget();
                 logDebugRequest(settings, 'impersonate', profile, presetName, prompt);
-                const result = await this.requestCompletion({ context, profile, prompt, signal });
+                const result = await this.requestCompletion({
+                    context, profile, prompt, signal, mode, useLiveSettings,
+                    getResponseLength: this.core?.getResponseLength,
+                });
                 const currentComposer = this.getComposer();
 
                 if (!await isTargetCurrent() || currentComposer !== composer || composer.value !== source) {
@@ -262,7 +265,7 @@ export class GuidedActions {
                     code: 'revision_guidance_required',
                 });
             }
-            const { profile, mode, preset, presetName } = validateGuidedProfile(context, settings.profileIds[profileKey]);
+            const { profile, mode, preset, presetName, useLiveSettings } = validateGuidedProfile(context, settings.profileIds[profileKey]);
             const messageIndex = context.chat.length - 1;
             const targetMessage = context.chat[messageIndex];
             if (!isSwipeableAssistantMessage(targetMessage)) {
@@ -337,6 +340,9 @@ export class GuidedActions {
                         profile,
                         prompt,
                         signal,
+                        mode,
+                        useLiveSettings,
+                        getResponseLength: this.core?.getResponseLength,
                         onProgress: chunk => session.update(chunk),
                     });
                 } catch (error) {

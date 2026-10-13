@@ -16,14 +16,49 @@ function extractResponse(result) {
     };
 }
 
-function createRequestOptions({ stream, signal }) {
+function createRequestOptions({ stream, signal, useLiveSettings }) {
     return {
         stream,
         signal,
         extractData: true,
-        includePreset: true,
-        includeInstruct: true,
+        includePreset: !useLiveSettings,
+        includeInstruct: !useLiveSettings,
     };
+}
+
+async function createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength }) {
+    if (!useLiveSettings) return undefined;
+    const service = mode === 'chat' ? context.ChatCompletionService : context.TextCompletionService;
+    if (!service?.presetToGeneratePayload) {
+        throw new GuidedError('This SillyTavern version does not expose live completion payload conversion.', {
+            code: 'live_settings_unavailable',
+        });
+    }
+    // Convert live settings without loading a saved preset.
+    let payload;
+    if (mode === 'chat') {
+        // The host clears the selected logit bias unless bias_presets is supplied.
+        const settings = context.chatCompletionSettings;
+        payload = await service.presetToGeneratePayload({
+            bias_presets: settings?.bias_presets ?? {},
+            bias_preset_selected: settings?.bias_preset_selected,
+        }, {}, { model: profile.model, messages: prompt });
+    } else {
+        const responseLength = getResponseLength?.();
+        if (!Number.isFinite(responseLength) || responseLength <= 0) {
+            throw new GuidedError('The live text-completion response length is unavailable.', {
+                code: 'live_settings_unavailable',
+            });
+        }
+        payload = await service.presetToGeneratePayload({ genamt: responseLength }, {}, { model: profile.model, prompt });
+    }
+    // Connection Manager remains responsible for the resolved profile's routing.
+    for (const key of ['chat_completion_source', 'api_type', 'api_server', 'secret_id',
+        'custom_url', 'vertexai_region', 'zai_endpoint', 'siliconflow_endpoint', 'minimax_endpoint',
+        'reverse_proxy', 'proxy_password', 'custom_prompt_post_processing']) {
+        delete payload[key];
+    }
+    return payload;
 }
 
 function convertRequestError(error, signal) {
@@ -34,13 +69,15 @@ function convertRequestError(error, signal) {
     });
 }
 
-export async function sendGuidedCompletion({ context, profile, prompt, signal }) {
+export async function sendGuidedCompletion({ context, profile, prompt, signal, mode, useLiveSettings = false, getResponseLength }) {
     try {
+        const payload = await createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength });
         const result = await context.ConnectionManagerRequestService.sendRequest(
             profile.id,
             prompt,
             undefined,
-            createRequestOptions({ stream: false, signal }),
+            createRequestOptions({ stream: false, signal, useLiveSettings }),
+            ...(payload ? [{ ...payload, stream: false }] : []),
         );
         const content = extractResponse(result).text.trim();
         if (!content) {
@@ -52,15 +89,17 @@ export async function sendGuidedCompletion({ context, profile, prompt, signal })
     }
 }
 
-export async function streamGuidedCompletion({ context, profile, prompt, signal, onProgress = () => {} }) {
+export async function streamGuidedCompletion({ context, profile, prompt, signal, mode, useLiveSettings = false, getResponseLength, onProgress = () => {} }) {
     let latest = { text: '', reasoning: '', signature: null };
 
     try {
+        const payload = await createLivePayload({ context, profile, prompt, mode, useLiveSettings, getResponseLength });
         const response = await context.ConnectionManagerRequestService.sendRequest(
             profile.id,
             prompt,
             undefined,
-            createRequestOptions({ stream: true, signal }),
+            createRequestOptions({ stream: true, signal, useLiveSettings }),
+            ...(payload ? [{ ...payload, stream: true }] : []),
         );
 
         if (typeof response === 'function') {

@@ -200,18 +200,22 @@ describe('GuidedActions impersonation', () => {
         expect(harness.notify.info).toHaveBeenCalledWith('Guided request cancelled.');
     });
 
-    it('keeps current-profile mode while applying its resolved bound preset', async () => {
+    it.each([
+        ['impersonate', 'impersonate', 'requestCompletion'],
+        ['swipe', 'guidedSwipe', 'requestSwipeCompletion'],
+        ['revision', 'guidedRevision', 'requestSwipeCompletion'],
+    ])('preserves live settings for current-profile %s', async (kind, action, request) => {
         const harness = createHarness();
-        harness.settings.profileIds.impersonate = CURRENT_PROFILE;
+        harness.settings.profileIds[kind] = CURRENT_PROFILE;
         harness.capturePrompt.mockImplementation(async ({ context }) => {
-            expect(context.chatCompletionSettings.prompts[0].identifier).toBe('guided');
+            expect(context.chatCompletionSettings.prompts[0].identifier).toBe('current');
             return ['captured prompt'];
         });
 
-        await harness.actions.impersonate();
+        await harness.actions[action]();
 
         expect(harness.context.ConnectionManagerRequestService.getProfile).toHaveBeenCalledWith('guided');
-        expect(harness.requestCompletion).toHaveBeenCalledWith(expect.objectContaining({ profile: harness.profile }));
+        expect(harness[request]).toHaveBeenCalledWith(expect.objectContaining({ profile: harness.profile, mode: 'chat', useLiveSettings: true }));
         expect(harness.context.chatCompletionSettings.prompts[0].identifier).toBe('current');
     });
 

@@ -3,6 +3,7 @@
 import { extension_settings } from '../../../extensions.js';
 import {
     addOneMessage,
+    amount_gen,
     cleanUpMessage,
     ensureSwipes,
     getStoppingStrings,
@@ -21,6 +22,7 @@ async function init() {
             extensionSettings: extension_settings,
             saveSettings: saveSettingsDebounced,
             core: {
+                getResponseLength: () => Number(amount_gen),
                 addOneMessage,
                 cleanUpMessage,
                 ensureSwipes,

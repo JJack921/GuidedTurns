@@ -50,10 +50,10 @@ export function mountSettingsUI({ document, context, settings, saveSettings, onS
             return;
         }
         const info = describeProfile(context, profile);
-        const fallbackPreset = configuredProfileId === CURRENT_PROFILE && !profile.preset
-            ? activePresetName(context, info.mode)
-            : '';
-        const presetLabel = fallbackPreset ? `${fallbackPreset} (active fallback)` : info.preset;
+        const livePreset = activePresetName(context, info.mode);
+        const presetLabel = configuredProfileId === CURRENT_PROFILE
+            ? (livePreset ? `Live settings (${livePreset})` : 'Live settings')
+            : info.preset;
         profileSummary.textContent = `${prefix}${info.name} · ${info.modeLabel} · ${info.api} · ${info.model} · Preset: ${presetLabel}`;
     };
 

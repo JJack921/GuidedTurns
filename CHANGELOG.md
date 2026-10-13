@@ -2,6 +2,13 @@
 
 All notable changes to Guided Turns are documented here.
 
+## [0.6.4] - 2026-10-13
+
+### Fixed
+
+- Preserve live SillyTavern prompts, samplers, and response length, including unsaved edits, when Guided Impersonation, Swipe, or Revision uses the current Connection Manager profile. Dedicated profiles continue using their saved presets.
+- Allow the current profile to use live settings without requiring a bound or available saved preset, and show live settings in profile summaries.
+
 ## [0.6.3] - 2026-08-23
 
 ### Fixed

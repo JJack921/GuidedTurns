@@ -106,9 +106,17 @@ export function validateGuidedProfile(context, configuredProfileId) {
         );
     }
 
-    const usesCurrentProfile = configuredProfileId === CURRENT_PROFILE;
-    const boundPresetName = typeof profile.preset === 'string' ? profile.preset.trim() : '';
-    const presetName = boundPresetName || (usesCurrentProfile ? activePresetName(context, targetMode) : '');
+    const useLiveSettings = configuredProfileId === CURRENT_PROFILE;
+    if (useLiveSettings) {
+        const name = activePresetName(context, targetMode);
+        return {
+            profile, profileId, mode: targetMode, preset: null,
+            presetName: name ? `Live settings (${name})` : 'Live settings',
+            useLiveSettings,
+        };
+    }
+
+    const presetName = typeof profile.preset === 'string' ? profile.preset.trim() : '';
     if (!presetName) {
         throw new GuidedError('The selected guided profile has no bound generation preset.', { code: 'preset_required' });
     }
@@ -122,5 +130,5 @@ export function validateGuidedProfile(context, configuredProfileId) {
         });
     }
 
-    return { profile, profileId, mode: targetMode, preset, presetName };
+    return { profile, profileId, mode: targetMode, preset, presetName, useLiveSettings };
 }
